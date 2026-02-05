@@ -37,18 +37,24 @@ tasks:
       - bun run build
 
   server:build:
-    desc: Build server binary
-    deps: [gen]
-    vars:
-      VERSION:
-        sh: go run scripts/release.go --version current
-    cmds:
-      - echo "Building backend for {{.GOOS}}/{{.GOARCH}}..."
-      - >
-        go build -trimpath -ldflags "-s -w
-          -X '{{.MODULE_PATH}}/internal/version.Version={{.VERSION}}'
-          -X '{{.MODULE_PATH}}/internal/version.CommitSHA={{.GIT_COMMIT}}'
-          " -o {{.BUILD_DIR}}/{{.APP_NAME}}{{.BINARY_EXTENSION}}
+      desc: Build server binary
+      deps: [gen]
+      vars:
+        VERSION:
+          sh: |
+            BRANCH=$(git rev-parse --abbrev-ref HEAD)
+            if [ "$BRANCH" = "dev" ]; then
+              echo "dev"
+            else
+              go run scripts/release.go --version current
+            fi
+      cmds:
+        - echo "Building backend for {{.GOOS}}/{{.GOARCH}}..."
+        - >
+          go build -trimpath -ldflags "-s -w
+            -X '{{.MODULE_PATH}}/internal/version.Version={{.VERSION}}'
+            -X '{{.MODULE_PATH}}/internal/version.CommitSHA={{.GIT_COMMIT}}'
+            " -o {{.BUILD_DIR}}/{{.APP_NAME}}{{.BINARY_EXTENSION}}
 
   # ────────────────────────────── Dev ──────────────────────────────
 
