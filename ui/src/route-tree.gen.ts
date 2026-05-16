@@ -73,20 +73,20 @@ const AuthedSettingsTabIdRoute = AuthedSettingsTabIdRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
+  "/": typeof AuthedIndexRoute
   "/login": typeof AuthLoginRoute
   "/$view": typeof AuthedViewRoute
   "/settings": typeof AuthedSettingsRouteWithChildren
   "/storage": typeof AuthedStorageRoute
-  "/": typeof AuthedIndexRoute
   "/settings/$tabId": typeof AuthedSettingsTabIdRoute
   "/share/$id": typeof ShareShareIdRoute
 }
 export interface FileRoutesByTo {
+  "/": typeof AuthedIndexRoute
   "/login": typeof AuthLoginRoute
   "/$view": typeof AuthedViewRoute
   "/settings": typeof AuthedSettingsRouteWithChildren
   "/storage": typeof AuthedStorageRoute
-  "/": typeof AuthedIndexRoute
   "/settings/$tabId": typeof AuthedSettingsTabIdRoute
   "/share/$id": typeof ShareShareIdRoute
 }
@@ -106,20 +106,20 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | "/"
     | "/login"
     | "/$view"
     | "/settings"
     | "/storage"
-    | "/"
     | "/settings/$tabId"
     | "/share/$id"
   fileRoutesByTo: FileRoutesByTo
   to:
+    | "/"
     | "/login"
     | "/$view"
     | "/settings"
     | "/storage"
-    | "/"
     | "/settings/$tabId"
     | "/share/$id"
   id:
@@ -147,21 +147,21 @@ declare module "@tanstack/react-router" {
     "/_share": {
       id: "/_share"
       path: ""
-      fullPath: ""
+      fullPath: "/"
       preLoaderRoute: typeof ShareRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/_authed": {
       id: "/_authed"
       path: ""
-      fullPath: ""
+      fullPath: "/"
       preLoaderRoute: typeof AuthedRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/_auth": {
       id: "/_auth"
       path: ""
-      fullPath: ""
+      fullPath: "/"
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }

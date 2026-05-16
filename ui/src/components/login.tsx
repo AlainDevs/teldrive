@@ -424,20 +424,20 @@ export const Login = memo(() => {
   }, [state.form.phoneCode, state.form.phoneNumber, state.loginType]);
 
   return (
-    <div className="mx-auto mt-12 flex w-full max-w-sm flex-col items-center gap-8">
-      <div className="flex flex-col items-center gap-2">
-        <TelegramIcon className="size-16 text-muted" />
-        <h1 className="text-xl font-semibold text-foreground">Sign in to TelDrive</h1>
-        <p className="text-sm text-muted">Enter your Telegram account details</p>
-      </div>
-
+    <div className="mx-auto mt-12 flex w-full max-w-sm flex-col items-center">
       <form
         autoComplete="off"
-        className="flex w-full flex-col gap-6 rounded-2xl border border-border bg-surface p-6"
+        className="flex w-full flex-col items-center gap-6 rounded-2xl border border-border bg-surface p-6 pt-8"
         onSubmit={handleSubmit(onSubmit)}
       >
+        <div className="flex flex-col items-center gap-2">
+          <TelegramIcon className="size-14 text-muted" />
+          <h1 className="text-xl font-semibold">Sign in to TelDrive</h1>
+          <p className="text-sm text-muted">Enter your Telegram account details</p>
+        </div>
+
         {state.loginType === "phone" ? (
-          <>
+          <div className="flex w-full flex-col gap-4">
             {state.step === 1 && (
               <Controller
                 name="phoneNumber"
@@ -498,20 +498,20 @@ export const Login = memo(() => {
                 )}
               />
             )}
-          </>
+          </div>
         ) : (
-          <div className="grid min-h-52 w-full place-content-center">
+          <div className="grid min-h-48 w-full place-content-center">
             {state.step !== 3 && state.qrCode && <QrCode qrCode={state.qrCode} />}
             {state.step !== 3 && !state.qrCode && <Spinner className="size-10" />}
           </div>
         )}
 
-        <div className="flex w-full flex-col items-center gap-3">
+        <div className="flex w-full flex-col items-center gap-2">
           {(state.loginType === "phone" || state.step === 3) && (
             <Button
               type="submit"
               fullWidth
-              variant="secondary"
+              variant="primary"
               isPending={state.isLoading}
             >
               {state.isLoading ? "Please Wait\u2026" : (state.step === 1 ? "Next" : "Login")}

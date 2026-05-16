@@ -42,6 +42,7 @@ func MigrateDB(pool *pgxpool.Pool) error {
 	defer std.Close()
 
 	goose.SetBaseFS(embedMigrations)
+	goose.SetTableName("migrations")
 	goose.SetLogger(goose.NopLogger())
 
 	if err := goose.SetDialect("postgres"); err != nil {

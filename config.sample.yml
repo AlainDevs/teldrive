@@ -8,17 +8,12 @@ db:
         max-lifetime: 10m
         max-open-connections: 25
     prepare-stmt: true
+    schema: teldrive
 events:
     db-buffer-size: 1000
     db-workers: 10
     deduplication-ttl: 5s
     poll-interval: 10s
-jobs:
-    sync-run:
-        max-attempts: 8
-    sync-transfer:
-        max-attempts: 2
-        timeout: 3h
 jwt:
     allowed-users: []
     secret: ""
@@ -45,9 +40,6 @@ log:
         enabled: false
         level: warn
     time-format: "2006-01-02 15:04:05"
-queue:
-    default-workers: 50
-    upload-workers: 4
 redis:
     addr: ""
     conn-max-idle-time: 5m
@@ -105,3 +97,6 @@ tg:
         max-retries: 10
         retention: 7d
         threads: 8
+worker:
+    cron-lock-id: 2123216947
+    cron-poll-every: 30s

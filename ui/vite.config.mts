@@ -1,4 +1,4 @@
-import { TanStackRouterVite } from "@tanstack/router-vite-plugin";
+import { tanstackRouter } from "@tanstack/router-vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import Icons from "unplugin-icons/vite";
@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   return {
     plugins: [
-      TanStackRouterVite({
+      tanstackRouter({
         quoteStyle: "double",
       }),
       react(),
@@ -37,7 +37,6 @@ export default defineConfig(({ mode }) => {
       proxy: {
         "/api": {
           target: env.VITE_API_URL || "http://localhost:5000",
-          ws: true,
           // headers: {
           //   Cookie: env.VITE_API_COOKIE || "",
           // },
