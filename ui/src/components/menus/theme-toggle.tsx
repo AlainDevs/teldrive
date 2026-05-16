@@ -11,19 +11,17 @@ export function ThemeToggle() {
 
   return (
     <Dropdown>
-      <Dropdown.Trigger>
-        <Button
-          variant="ghost"
-          isIconOnly
-        >
-          <IconPhSun className="pointer-events-none size-6 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-          <IconRiMoonClearLine
-            className="pointer-events-none absolute size-6 rotate-90 scale-0 transition-all
-            dark:rotate-0 dark:scale-100"
-          />
-          <span className="sr-only">Toggle theme</span>
-        </Button>
-      </Dropdown.Trigger>
+      <Button
+        variant="ghost"
+        isIconOnly
+      >
+        <IconPhSun className="pointer-events-none size-6 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+        <IconRiMoonClearLine
+          className="pointer-events-none absolute size-6 rotate-90 scale-0 transition-all
+          dark:rotate-0 dark:scale-100"
+        />
+        <span className="sr-only">Toggle theme</span>
+      </Button>
       <Dropdown.Popover>
         <Dropdown.Menu
           aria-label="Theme Menu"

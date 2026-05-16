@@ -133,12 +133,10 @@ export const UploadStatsChart = memo(
       <div className="w-full">
         <div className="flex justify-end mb-2">
           <Dropdown>
-            <Dropdown.Trigger>
-              <Button
-                variant="secondary"
-                className="rounded-xl px-4 py-2 font-medium bg-accent-soft text-accent-soft-foreground"
-              >{`${days} Days`}</Button>
-            </Dropdown.Trigger>
+            <Button
+              variant="secondary"
+              className="rounded-xl px-4 py-2 font-medium bg-accent-soft text-accent-soft-foreground"
+            >{`${days} Days`}</Button>
             <Dropdown.Popover className="min-w-32">
               <Dropdown.Menu>
                 {allowedDays.map((day) => (

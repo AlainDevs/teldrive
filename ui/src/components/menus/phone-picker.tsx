@@ -1,5 +1,4 @@
 import { memo, useMemo, useState } from "react";
-import { useFilter } from "@react-aria/i18n";
 import {
   Button,
   Input,
@@ -19,16 +18,17 @@ interface PhoneNoPickerProps {
 }
 
 export const PhoneNoPicker = memo(({ field }: PhoneNoPickerProps) => {
-  const { contains } = useFilter({
-    sensitivity: "base",
-  });
-
   const [isOpen, setIsOpen] = useState(false);
 
   const [value, setValue] = useState("");
 
   const codes = useMemo(
-    () => isoCodes.filter((composer) => contains(composer.country, value)),
+    () =>
+      value
+        ? isoCodes.filter((composer) =>
+            composer.country.toLowerCase().includes(value.toLowerCase()),
+          )
+        : isoCodes,
     [value],
   );
   const TriggerIcon = flags[field.value as keyof typeof flags];

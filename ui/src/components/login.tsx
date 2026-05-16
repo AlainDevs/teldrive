@@ -1,7 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useSearch } from "@tanstack/react-router";
-import { Button, Input, InputGroup, Label, Spinner, TextField } from "@heroui/react";
+import {
+  Button,
+  FieldError,
+  Input,
+  InputGroup,
+  Label,
+  Spinner,
+  TextField,
+} from "@heroui/react";
 import { AsYouType, type CountryCode, getPhoneCode } from "libphonenumber-js";
 import meta from "libphonenumber-js/metadata.min.json";
 import { Controller, useForm } from "react-hook-form";
@@ -415,24 +423,33 @@ export const Login = memo(() => {
   }, [state.form.phoneCode, state.form.phoneNumber, state.loginType]);
 
   return (
-    <div className="m-auto flex rounded-large max-w-md flex-col justify-center items-center bg-surface mt-6 gap-4 px-4 pt-6 pb-20">
+    <div className="mx-auto mt-6 flex w-full max-w-sm flex-col items-center rounded-large bg-surface p-6">
       <form
         autoComplete="off"
-        className="w-full flex flex-col items-center gap-8"
+        className="flex w-full flex-col items-center gap-6"
         onSubmit={handleSubmit(onSubmit)}
       >
         {state.loginType === "phone" ? (
           <>
-            <TelegramIcon className="size-40" />
+            <TelegramIcon className="size-20 text-muted" />
             {state.step === 1 && (
               <Controller
                 name="phoneNumber"
                 control={control}
                 rules={{ required: true }}
                 render={({ field }) => (
-                  <TextField isRequired className="w-full max-w-xs">
+                  <TextField isRequired className="w-full" name="phoneNumber">
                     <Label>Phone Number</Label>
-                    <InputGroup variant="secondary">
+                    <InputGroup>
+                      <InputGroup.Prefix>
+                        <Controller
+                          name="phoneCode"
+                          control={control}
+                          render={({ field: phoneCodeField }) => (
+                            <PhoneNoPicker field={phoneCodeField} />
+                          )}
+                        />
+                      </InputGroup.Prefix>
                       <InputGroup.Input
                         placeholder="Phone Number"
                         {...field}
@@ -442,6 +459,7 @@ export const Login = memo(() => {
                         }}
                       />
                     </InputGroup>
+                    <FieldError />
                   </TextField>
                 )}
               />
@@ -452,21 +470,17 @@ export const Login = memo(() => {
                 control={control}
                 rules={{ required: true }}
                 render={({ field }) => (
-                  <TextField isRequired className="w-full max-w-xs">
+                  <TextField isRequired className="w-full" name="otpCode">
                     <Label>OTP Code</Label>
-                    <InputGroup variant="secondary">
-                      <InputGroup.Input
-                        placeholder="Enter the code"
-                        {...field}
-                      />
-                    </InputGroup>
+                    <Input placeholder="Enter the code" {...field} />
+                    <FieldError />
                   </TextField>
                 )}
               />
             )}
           </>
         ) : (
-          <div className="min-h-64 grid place-content-center">
+          <div className="grid min-h-48 w-full place-content-center">
             {state.step !== 3 && state.qrCode && <QrCode qrCode={state.qrCode} />}
 
             {state.step !== 3 && !state.qrCode && <Spinner className="size-10" />}
@@ -479,30 +493,24 @@ export const Login = memo(() => {
             control={control}
             rules={{ required: true }}
             render={({ field }) => (
-              <TextField isRequired className="w-full max-w-xs">
+              <TextField isRequired className="w-full" name="password">
                 <Label>2FA Password</Label>
-                <InputGroup variant="secondary">
-                  <InputGroup.Input
-                    placeholder="Enter your 2FA password"
-                    type="password"
-                    {...field}
-                  />
-                </InputGroup>
+                <Input placeholder="Enter your 2FA password" type="password" {...field} />
+                <FieldError />
               </TextField>
             )}
           />
         )}
 
-        <div className="flex flex-col gap-6 w-full items-center mt-4">
+        <div className="flex w-full flex-col items-center gap-3">
           {(state.loginType === "phone" || state.step === 3) && (
             <Button
               type="submit"
               fullWidth
               variant="secondary"
               isPending={state.isLoading}
-              className="max-w-xs text-inherit"
             >
-              {state.isLoading ? "Please Wait…" : (state.step === 1 ? "Next" : "Login")}
+              {state.isLoading ? "Please Wait\u2026" : (state.step === 1 ? "Next" : "Login")}
             </Button>
           )}
           {state.step !== 3 && (
@@ -514,8 +522,7 @@ export const Login = memo(() => {
                 }))
               }
               fullWidth
-              variant="secondary"
-              className="max-w-xs text-inherit"
+              variant="ghost"
             >
               {state.loginType === "qr" ? "Phone Login" : "QR Login"}
             </Button>
