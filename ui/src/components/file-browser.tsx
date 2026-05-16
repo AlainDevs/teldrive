@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef } from "react";
+import { memo, useMemo } from "react";
 import { useSuspenseInfiniteQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import {
@@ -9,11 +9,6 @@ import {
   FileNavbar,
   FileToolbar,
 } from "file-browser";
-import type {
-  StateSnapshot,
-  VirtuosoGridHandle,
-  VirtuosoHandle,
-} from "react-virtuoso";
 import useBreakpoint from "use-breakpoint";
 
 import {
@@ -37,12 +32,6 @@ import { Upload } from "./upload";
 import { UploadDropzone } from "./upload/drop-zone";
 import type { BrowseView, FileListParams } from "@/types";
 
-let firstRender = true;
-
-function isVirtuosoList(value: any): value is VirtuosoHandle {
-  return (value as VirtuosoHandle).getState !== undefined;
-}
-
 const modalFileActions = [
   FbActions.RenameFile.id,
   FbActions.CreateFolder.id,
@@ -52,16 +41,10 @@ const modalFileActions = [
 
 const fileRoute = getRouteApi("/_authed/$view");
 
-const positions = new Map<string, StateSnapshot>();
-
 export const DriveFileBrowser = memo(() => {
   const { view } = fileRoute.useParams();
 
   const search = fileRoute.useSearch();
-
-  const listRef = useRef<VirtuosoHandle | VirtuosoGridHandle>(null);
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
 
   const [session] = useSession();
 
@@ -95,28 +78,6 @@ export const DriveFileBrowser = memo(() => {
     }
 
     return [];
-  }, [search?.path, view]);
-
-  useEffect(() => {
-    if (firstRender) {
-      firstRender = false;
-      return;
-    }
-
-    setTimeout(() => {
-      listRef.current?.scrollTo({
-        left: 0,
-        top: positions.get(view + search?.path || "")?.scrollTop ?? 0,
-      });
-    }, 0);
-
-    return () => {
-      if (listRef.current && isVirtuosoList(listRef.current)) {
-        listRef.current?.getState((state) =>
-          positions.set(view + search?.path || "", state),
-        );
-      }
-    };
   }, [search?.path, view]);
 
   return (

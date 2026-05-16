@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef } from "react";
+import { memo, useMemo } from "react";
 import { useSuspenseInfiniteQuery } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import {
@@ -9,7 +9,6 @@ import {
   FileNavbar,
   FileToolbar,
 } from "file-browser";
-import type { StateSnapshot, VirtuosoGridHandle, VirtuosoHandle } from "react-virtuoso";
 import useBreakpoint from "use-breakpoint";
 
 import { chainSharedLinks } from "@/utils/common";
@@ -20,15 +19,7 @@ import { useModalStore } from "@/utils/stores";
 import PreviewModal from "./modals/preview";
 import { $api } from "@/utils/api";
 
-let firstRender = true;
-
-function isVirtuosoList(value: any): value is VirtuosoHandle {
-  return (value as VirtuosoHandle).getState !== undefined;
-}
-
 const route = getRouteApi("/_share/share/$id");
-
-const positions = new Map<string, StateSnapshot>();
 
 const disabledActions = [
   FbActions.UploadFiles.id,
@@ -44,8 +35,6 @@ export const SharedFileBrowser = memo(() => {
   const { id } = route.useParams();
 
   const { path } = route.useSearch();
-
-  const listRef = useRef<VirtuosoHandle | VirtuosoGridHandle>(null);
 
   const { breakpoint } = useBreakpoint(BREAKPOINTS);
 
@@ -84,26 +73,6 @@ export const SharedFileBrowser = memo(() => {
   const modalOpen = useModalStore((state) => state.open);
 
   const modalOperation = useModalStore((state) => state.operation);
-
-  useEffect(() => {
-    if (firstRender) {
-      firstRender = false;
-      return;
-    }
-
-    setTimeout(() => {
-      listRef.current?.scrollTo({
-        left: 0,
-        top: positions.get(id + path)?.scrollTop ?? 0,
-      });
-    }, 0);
-
-    return () => {
-      if (listRef.current && isVirtuosoList(listRef.current)) {
-        listRef.current?.getState((state) => positions.set(id + path, state));
-      }
-    };
-  }, [id, path]);
 
   return (
     <div className="size-full m-auto">
