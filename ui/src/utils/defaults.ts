@@ -4,18 +4,18 @@ export enum SortOrder {
 }
 
 export const sortViewMap = {
-  "my-drive": {
-    sortId: "sort_files_by_name",
-    order: SortOrder.ASC,
-  },
   browse: {
-    sortId: "sort_files_by_name",
     order: SortOrder.ASC,
+    sortId: "sort_files_by_name",
   },
-  search: { sortId: "sort_files_by_name", order: SortOrder.ASC },
-  recent: { sortId: "sort_files_by_date", order: SortOrder.DESC },
-  category: { sortId: "sort_files_by_name", order: SortOrder.ASC },
-  shared: { sortId: "sort_files_by_date", order: SortOrder.DESC },
+  category: { order: SortOrder.ASC, sortId: "sort_files_by_name" },
+  "my-drive": {
+    order: SortOrder.ASC,
+    sortId: "sort_files_by_name",
+  },
+  recent: { order: SortOrder.DESC, sortId: "sort_files_by_date" },
+  search: { order: SortOrder.ASC, sortId: "sort_files_by_name" },
+  shared: { order: SortOrder.DESC, sortId: "sort_files_by_date" },
 };
 
 export type SortState = typeof sortViewMap;
@@ -29,9 +29,9 @@ export const defaultSortState = getSortState();
 export const defaultViewId = localStorage.getItem("viewId") || "enable_list_view";
 
 export const sortIdsMap = {
-  sort_files_by_name: "name",
   sort_files_by_date: "updatedAt",
+  sort_files_by_name: "name",
   sort_files_by_size: "size",
 } as const;
 
-export const BREAKPOINTS = { xs: 0, sm: 476, md: 576, lg: 992 };
+export const BREAKPOINTS = { lg: 992, md: 576, sm: 476, xs: 0 };

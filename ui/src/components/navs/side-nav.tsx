@@ -1,20 +1,20 @@
-import { memo, type SVGProps } from "react";
+import { type SVGProps, memo } from "react";
 import { Button } from "@heroui/react";
 import IconBasilGoogleDriveOutline from "~icons/basil/google-drive-outline";
 import IconIcOutlineSdStorage from "~icons/ic/outline-sd-storage";
 import IconMdiRecent from "~icons/mdi/recent";
 import ShareIcon from "~icons/fluent/share-24-regular";
 import clsx from "clsx";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useLocation, useParams } from "@tanstack/react-router";
 
 import { ForwardLink } from "@/components/forward-link";
 
 export const categories = [
-  { id: "my-drive", name: "My Drive", icon: IconBasilGoogleDriveOutline },
-  { id: "recent", name: "Recent", icon: IconMdiRecent },
-  { id: "shared", name: "Shared", icon: ShareIcon },
-  { id: "storage", name: "Storage", icon: IconIcOutlineSdStorage },
+  { icon: IconBasilGoogleDriveOutline, id: "my-drive", name: "My Drive" },
+  { icon: IconMdiRecent, id: "recent", name: "Recent" },
+  { icon: ShareIcon, id: "shared", name: "Shared" },
+  { icon: IconIcOutlineSdStorage, id: "storage", name: "Storage" },
 ] as const;
 
 interface SidNavItemProps {
@@ -52,9 +52,9 @@ const SidNavItem = memo(({ id, icon: Icon, name }: SidNavItemProps) => {
               className="absolute inset-0 bg-accent-soft rounded-3xl -z-10"
               initial={false}
               transition={{
-                type: "spring",
-                stiffness: 300,
                 damping: 30,
+                stiffness: 300,
+                type: "spring",
               }}
             />
           )}
@@ -64,9 +64,9 @@ const SidNavItem = memo(({ id, icon: Icon, name }: SidNavItemProps) => {
             scale: isActive ? 1.1 : 1,
           }}
           transition={{
-            type: "spring",
-            stiffness: 400,
             damping: 17,
+            stiffness: 400,
+            type: "spring",
           }}
           className="flex items-center justify-center relative z-10"
         >
@@ -85,8 +85,7 @@ const SidNavItem = memo(({ id, icon: Icon, name }: SidNavItemProps) => {
   );
 });
 
-export const SideNav = memo(() => {
-  return (
+export const SideNav = memo(() => (
     <aside
       className={clsx(
         "w-full md:w-20 md:pt-20 pt-0 h-16 md:h-full transition-colors duration-300",
@@ -101,5 +100,4 @@ export const SideNav = memo(() => {
         ))}
       </ul>
     </aside>
-  );
-});
+  ));

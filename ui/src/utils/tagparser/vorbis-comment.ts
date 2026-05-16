@@ -61,7 +61,7 @@ function parseVorbisComment(bytes: Uint8Array, tags: Tags, offset = 0) {
     const userCommentLength = unpackVorbisCommentBytes(bytes, offset);
     offset += 4;
 
-    const userComment = decode(sliceBytes(bytes, offset, userCommentLength), "utf-8");
+    const userComment = decode(sliceBytes(bytes, offset, userCommentLength), "utf8");
     const [name, value] = userComment.split("=");
 
     if (name === "METADATA_BLOCK_PICTURE") {

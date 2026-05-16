@@ -8,7 +8,7 @@ import parseWavFile from "./parse-wav";
 // http://id3lib.sourceforge.net/id3/id3v2com-00.html
 function getID3TagSize(buffer: ArrayBuffer) {
   const bytes = getBytes(buffer, 6, 4);
-  return bytes[0] * 2097152 + bytes[1] * 16384 + bytes[2] * 128 + bytes[3];
+  return bytes[0] * 2_097_152 + bytes[1] * 16_384 + bytes[2] * 128 + bytes[3];
 }
 
 async function parseFile(file: string, buffer: ArrayBuffer) {

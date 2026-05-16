@@ -23,8 +23,8 @@ async function parseWavFile(buffer: ArrayBuffer, offset = 4) {
   const samples = unpackBytes(samplesBytes, { endian: "little" });
 
   return {
-    sampleRate,
     duration: Math.floor(samples / dataRate),
+    sampleRate,
   };
 }
 
@@ -40,8 +40,8 @@ function getFmtChunkData(buffer: ArrayBuffer, offset: number) {
   const dataRate = unpackBytes(dataRateBytes, { endian: "little" });
 
   return {
-    sampleRate,
     dataRate,
+    sampleRate,
   };
 }
 

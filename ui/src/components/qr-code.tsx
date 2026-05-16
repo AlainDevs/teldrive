@@ -11,28 +11,26 @@ export default function QrCode({ qrCode }: { qrCode: string }) {
 
   const [isQrMounted, setisQrMounted] = useState(false);
 
-  const qrStyle = useMemo(() => {
-    return new QRCodeStyling({
-      width: QR_SIZE,
-      height: QR_SIZE,
-      margin: 10,
-      type: "svg",
-      dotsOptions: {
-        type: "rounded",
-      },
+  const qrStyle = useMemo(() => new QRCodeStyling({
       cornersSquareOptions: {
         type: "extra-rounded",
       },
+      dotsOptions: {
+        type: "rounded",
+      },
+      height: QR_SIZE,
       imageOptions: {
         hideBackgroundDots: true,
         imageSize: 0.4,
         margin: 2,
       },
+      margin: 10,
       qrOptions: {
         errorCorrectionLevel: "M",
       },
-    });
-  }, []);
+      type: "svg",
+      width: QR_SIZE,
+    }), []);
 
   useEffect(() => {
     if (ref.current && qrStyle) {

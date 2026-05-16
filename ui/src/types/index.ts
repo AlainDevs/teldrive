@@ -1,12 +1,12 @@
 import type { operations } from "@/lib/api";
 import type { Dispatch, SetStateAction } from "react";
 
-export type FileResponse = {
+export interface FileResponse {
   files: SingleFile[];
   meta: { totalPages: number; count: number; currentPage: number };
-};
+}
 
-export type SingleFile = {
+export interface SingleFile {
   name: string;
   type: string;
   mimeType: string;
@@ -19,14 +19,14 @@ export type SingleFile = {
   id: string;
   encrypted?: boolean;
   path?: string;
-};
+}
 
-export type FilePayload = {
+export interface FilePayload {
   id?: string;
   payload?: Record<string, any>;
-};
+}
 
-export type UploadPart = {
+export interface UploadPart {
   name: string;
   partId: number;
   partNo: number;
@@ -34,15 +34,15 @@ export type UploadPart = {
   channelId: number;
   encrypted?: boolean;
   salt?: string;
-};
+}
 
-export type Message = {
+export interface Message {
   message: string;
   error?: string;
   code?: number;
-};
+}
 
-export type Session = {
+export interface Session {
   name: string;
   userName: string;
   userId: number;
@@ -50,9 +50,9 @@ export type Session = {
   sessionId: string;
   hash?: string;
   expires: string;
-};
+}
 
-export type UserSession = {
+export interface UserSession {
   sessionId: string;
   hash?: string;
   createdAt: string;
@@ -61,64 +61,62 @@ export type UserSession = {
   appName?: string;
   valid: boolean;
   current: boolean;
-};
+}
 
 export type BrowseView = "my-drive" | "search" | "recent" | "browse" | "shared";
 
-export type FileListParams = {
+export interface FileListParams {
   view: BrowseView;
   params: Exclude<operations["Files_list"]["parameters"]["query"], undefined>;
-};
+}
 
-export type ShareListParams = {
+export interface ShareListParams {
   id: string;
   path?: string;
-};
+}
 
-export type AccountStats = {
+export interface AccountStats {
   channelId: number;
   bots: string[];
-};
+}
 
-export type Channel = {
+export interface Channel {
   channelName?: string;
   channelId: number;
-};
+}
 
-export type Tags = {
-  [key: string]: any;
-};
+export type Tags = Record<string, any>;
 
-export type AudioMetadata = {
+export interface AudioMetadata {
   artist: string;
   title: string;
   cover: string;
-};
+}
 
-export type UploadStats = {
+export interface UploadStats {
   uploadDate: string;
   totalUploaded: number;
-};
+}
 
-export type CategoryStorage = {
+export interface CategoryStorage {
   category: string;
   totalFiles: number;
   totalSize: number;
-};
+}
 
-export type FileShare = {
+export interface FileShare {
   id: string;
   expirationDate: string;
   protected: boolean;
   type: string;
   name: string;
-};
+}
 
 export type SetValue<T> = Dispatch<SetStateAction<T>>;
 
-export type PreviewFile = {
+export interface PreviewFile {
   id: string;
   name: string;
   mimeType: string;
   previewType: string;
-};
+}

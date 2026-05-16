@@ -6,61 +6,73 @@ import { memo, useMemo } from "react";
 import ReactApexChart from "react-apexcharts";
 
 const options: ApexOptions = {
-  legend: {
-    show: false,
-  },
-  colors: ["oklch(var(--color-accent))"],
   chart: {
-    height: 250,
-    type: "area",
     fontFamily: "Rubik, sans-serif",
-    toolbar: {
-      show: false,
-    },
-    zoom: {
-      enabled: false,
-    },
+    height: 250,
     sparkline: {
       enabled: false,
     },
-  },
-  fill: {
-    type: "gradient",
-    gradient: {
-      shadeIntensity: 1,
-      opacityFrom: 0.45,
-      opacityTo: 0.05,
-      stops: [20, 100, 100, 100],
+    toolbar: {
+      show: false,
+    },
+    type: "area",
+    zoom: {
+      enabled: false,
     },
   },
-  stroke: {
-    width: 3,
-    curve: "smooth",
-  },
-  grid: {
-    show: true,
-    borderColor: "var(--color-border)",
-    strokeDashArray: 4,
-    padding: {
-      left: 20,
-      right: 20,
-      bottom: 0,
-    },
-  },
+  colors: ["oklch(var(--color-accent))"],
   dataLabels: {
     enabled: false,
   },
+  fill: {
+    gradient: {
+      opacityFrom: 0.45,
+      opacityTo: 0.05,
+      shadeIntensity: 1,
+      stops: [20, 100, 100, 100],
+    },
+    type: "gradient",
+  },
+  grid: {
+    borderColor: "var(--color-border)",
+    padding: {
+      bottom: 0,
+      left: 20,
+      right: 20,
+    },
+    show: true,
+    strokeDashArray: 4,
+  },
+  legend: {
+    show: false,
+  },
   markers: {
-    size: 5,
     colors: ["oklch(var(--color-accent))"],
-    strokeColors: "var(--color-surface)",
-    strokeWidth: 2,
     hover: {
       size: 7,
     },
+    size: 5,
+    strokeColors: "var(--color-surface)",
+    strokeWidth: 2,
+  },
+  stroke: {
+    curve: "smooth",
+    width: 3,
+  },
+  tooltip: {
+    style: {
+      fontFamily: "Rubik, sans-serif",
+      fontSize: "12px",
+    },
+    theme: "dark",
+    x: {
+      show: true,
+    },
+    y: {
+      formatter: (val) => `${val.toFixed(2)} GB`,
+    },
   },
   xaxis: {
-    type: "category",
     axisBorder: {
       show: false,
     },
@@ -74,6 +86,7 @@ const options: ApexOptions = {
         fontWeight: 500,
       },
     },
+    type: "category",
   },
   yaxis: {
     labels: {
@@ -84,19 +97,6 @@ const options: ApexOptions = {
       },
     },
   },
-  tooltip: {
-    theme: "dark",
-    x: {
-      show: true,
-    },
-    y: {
-      formatter: (val) => `${val.toFixed(2)} GB`,
-    },
-    style: {
-      fontSize: "12px",
-      fontFamily: "Rubik, sans-serif",
-    },
-  },
 };
 
 function getChartData(stats: UploadStats[]): ApexOptions {
@@ -104,16 +104,16 @@ function getChartData(stats: UploadStats[]): ApexOptions {
   const data = stats.map((stat) => stat.totalUploaded);
   return {
     ...options,
+    series: [
+      {
+        data,
+        name: "Uploaded",
+      },
+    ],
     xaxis: {
       ...options.xaxis,
       categories,
     },
-    series: [
-      {
-        name: "Uploaded",
-        data,
-      },
-    ],
   };
 }
 

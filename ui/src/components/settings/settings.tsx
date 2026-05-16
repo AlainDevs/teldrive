@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { getRouteApi, Outlet } from "@tanstack/react-router";
+import { Outlet, getRouteApi } from "@tanstack/react-router";
 import { Button } from "@heroui/react";
 import CodiconAccount from "~icons/codicon/account";
 import CodiconSettings from "~icons/codicon/settings";
@@ -13,24 +13,24 @@ import { motion } from "framer-motion";
 
 const Tabs = [
   {
-    id: "general",
     icon: CodiconSettings,
+    id: "general",
   },
   {
-    id: "appearance",
     icon: FluentDarkTheme20Filled,
+    id: "appearance",
   },
   {
-    id: "account",
     icon: CodiconAccount,
+    id: "account",
   },
   {
-    id: "jobs",
     icon: MaterialSymbolsScheduleRounded,
+    id: "jobs",
   },
   {
-    id: "info",
     icon: IcOutlineInfo,
+    id: "info",
   },
 ];
 
@@ -68,9 +68,9 @@ export const Settings = memo(() => {
                   className="absolute rounded-full inset-x-1 bottom-0 h-1 md:inset-y-1 md:left-0 md:right-0 md:h-auto z-0 bg-accent-soft text-accent-soft-foreground"
                   layoutId="pill"
                   transition={{
-                    type: "spring",
                     bounce: 0.1,
                     duration: 0.4,
+                    type: "spring",
                   }}
                 />
               )}

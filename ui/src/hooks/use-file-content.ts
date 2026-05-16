@@ -10,8 +10,8 @@ export default function useFileContent(url: string) {
     fetch(url)
       .then((res) => res.text())
       .then(setResponse)
-      .catch((e) => setError(e.message))
+      .catch((error) => setError(error.message))
       .finally(() => setValidating(false));
   }, [url]);
-  return { response, error, validating };
+  return { error, response, validating };
 }

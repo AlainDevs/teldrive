@@ -22,9 +22,9 @@ import MdiProtectedOutline from "~icons/mdi/protected-outline";
 import { $api } from "@/utils/api";
 import { useSearch } from "@tanstack/react-router";
 
-type FileModalProps = {
+interface FileModalProps {
   queryKey: any;
-};
+}
 
 interface RenameDialogProps {
   queryKey: any;
@@ -40,8 +40,8 @@ const RenameDialog = memo(({ queryKey, handleClose }: RenameDialogProps) => {
   });
   const { currentFile, actions } = useModalStore(
     useShallow((state) => ({
-      currentFile: state.currentFile,
       actions: state.actions,
+      currentFile: state.currentFile,
     })),
   );
 
@@ -50,13 +50,13 @@ const RenameDialog = memo(({ queryKey, handleClose }: RenameDialogProps) => {
       e.preventDefault();
       updateFiles
         .mutateAsync({
+          body: {
+            name: currentFile?.name,
+          },
           params: {
             path: {
               id: currentFile.id,
             },
-          },
-          body: {
-            name: currentFile?.name,
           },
         })
         .then(handleClose);
@@ -115,8 +115,8 @@ const FolderCreateDialog = memo(({ queryKey, handleClose }: FolderCreateDialogPr
   });
   const { currentFile, actions } = useModalStore(
     useShallow((state) => ({
-      currentFile: state.currentFile,
       actions: state.actions,
+      currentFile: state.currentFile,
     })),
   );
 
@@ -127,8 +127,8 @@ const FolderCreateDialog = memo(({ queryKey, handleClose }: FolderCreateDialogPr
         .mutateAsync({
           body: {
             name: currentFile.name,
-            type: "folder",
             path: path ? path : "/",
+            type: "folder",
           },
         })
         .then(() => handleClose());
@@ -279,12 +279,12 @@ const ShareFileDialog = memo(({ handleClose }: ShareFileDialogProps) => {
             payload.password = data.password;
           }
           createShare.mutateAsync({
+            body: payload,
             params: {
               path: {
                 id: file.id,
               },
             },
-            body: payload,
           });
         })();
       }
@@ -401,9 +401,9 @@ const ShareFileDialog = memo(({ handleClose }: ShareFileDialogProps) => {
 export const FileOperationModal = memo(({ queryKey }: FileModalProps) => {
   const { open, operation, actions } = useModalStore(
     useShallow((state) => ({
+      actions: state.actions,
       open: state.open,
       operation: state.operation,
-      actions: state.actions,
     })),
   );
 
@@ -431,7 +431,7 @@ export const FileOperationModal = memo(({ queryKey }: FileModalProps) => {
   };
 
   return (
-    <Modal.Backdrop isOpen={open} onOpenChange={(isOpen) => { if (!isOpen) handleClose(); }}>
+    <Modal.Backdrop isOpen={open} onOpenChange={(isOpen) => { if (!isOpen) {handleClose();} }}>
       <Modal.Container>
         <Modal.Dialog>
           {renderOperation()}

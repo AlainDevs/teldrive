@@ -8,8 +8,7 @@ interface ColorPickerMenuProps {
   color: string;
   setColor: (color: string) => void;
 }
-export const ColorPickerMenu = memo(({ color, setColor }: ColorPickerMenuProps) => {
-  return (
+export const ColorPickerMenu = memo(({ color, setColor }: ColorPickerMenuProps) => (
     <Popover>
       <Popover.Trigger>
         <Button aria-label="Choose Color"
@@ -33,5 +32,4 @@ export const ColorPickerMenu = memo(({ color, setColor }: ColorPickerMenuProps) 
         </div>
       </Popover.Content>
     </Popover>
-  );
-});
+  ));

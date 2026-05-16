@@ -6,8 +6,7 @@ import { scrollbarClasses } from "@/utils/classes";
 import clsx from "clsx";
 import { TopLoader } from "@/components/top-progress";
 
-export const ShareLayout = memo(() => {
-  return (
+export const ShareLayout = memo(() => (
     <div className="flex flex-col-reverse md:flex-row h-dvh overflow-hidden">
       <div className="relative flex flex-1 flex-col overflow-x-hidden">
         <Header />
@@ -22,5 +21,4 @@ export const ShareLayout = memo(() => {
         </main>
       </div>
     </div>
-  );
-});
+  ));

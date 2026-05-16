@@ -33,14 +33,14 @@ const SearchBar = memo(({ className }: SearchBarProps) => {
     debounce(
       (newValue: string) =>
         navigate({
-          to: "/$view",
-          search: {
-            query: newValue,
-          },
           params: {
             view: "search",
           },
           replace: true,
+          search: {
+            query: newValue,
+          },
+          to: "/$view",
         }),
       1000,
     ),
@@ -100,8 +100,7 @@ const SearchBar = memo(({ className }: SearchBarProps) => {
   );
 });
 
-export default memo(function Header({ auth }: { auth?: boolean }) {
-  return (
+export default memo(({ auth }: { auth?: boolean }) => (
     <header className="sticky top-0 z-50 flex items-center min-h-12 xs:min-h-16 px-4">
       <div className="flex-1 flex gap-2 items-center">
         <Link
@@ -120,5 +119,4 @@ export default memo(function Header({ auth }: { auth?: boolean }) {
         {auth && <ProfileDropDown />}
       </div>
     </header>
-  );
-});
+  ));

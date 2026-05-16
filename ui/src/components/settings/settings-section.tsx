@@ -1,4 +1,4 @@
-import { memo, type ReactNode } from "react";
+import { type ReactNode, memo } from "react";
 import { motion } from "framer-motion";
 
 interface SettingsSectionProps {
@@ -8,8 +8,7 @@ interface SettingsSectionProps {
 }
 
 export const SettingsSection = memo(
-  ({ title, description, children }: SettingsSectionProps) => {
-    return (
+  ({ title, description, children }: SettingsSectionProps) => (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -28,6 +27,5 @@ export const SettingsSection = memo(
         </div>
         {children && <div className="space-y-4">{children}</div>}
       </motion.div>
-    );
-  },
+    ),
 );

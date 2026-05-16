@@ -28,7 +28,7 @@ export interface SettingFieldConfig<T> {
   description: string;
   placeholder?: string;
   defaultValue?: T;
-  options?: Array<{ value: T; label: string }>;
+  options?: { value: T; label: string }[];
   validation?: {
     pattern?: RegExp;
     custom?: (value: SettingValue) => string | true;
@@ -37,85 +37,85 @@ export interface SettingFieldConfig<T> {
 }
 
 const splitFileSizes = [
-  { value: 100 * 1024 * 1024, label: "100MB" },
-  { value: 500 * 1024 * 1024, label: "500MB" },
-  { value: 1000 * 1024 * 1024, label: "1GB" },
-  { value: 2 * 1000 * 1024 * 1024, label: "2GB" },
+  { label: "100MB", value: 100 * 1024 * 1024 },
+  { label: "500MB", value: 500 * 1024 * 1024 },
+  { label: "1GB", value: 1000 * 1024 * 1024 },
+  { label: "2GB", value: 2 * 1000 * 1024 * 1024 },
 ];
 
 export const generalSettingsConfig: SettingFieldConfig<SettingValue>[] = [
   {
-    key: "uploadConcurrency",
-    type: "number",
-    label: "Concurrency",
-    description: "Concurrent Part Uploads",
+    category: "upload",
     defaultValue: 4,
-    category: "upload",
+    description: "Concurrent Part Uploads",
+    key: "uploadConcurrency",
+    label: "Concurrency",
+    type: "number",
   },
   {
-    key: "uploadRetries",
-    type: "number",
-    label: "Upload Retries",
-    description: "Number of retries for each part upload",
+    category: "upload",
     defaultValue: 3,
-    category: "upload",
+    description: "Number of retries for each part upload",
+    key: "uploadRetries",
+    label: "Upload Retries",
+    type: "number",
   },
   {
-    key: "uploadRetryDelay",
-    type: "number",
-    label: "Upload Retry Delay",
-    description: "Delay between retries in milliseconds",
+    category: "upload",
     defaultValue: 1000,
-    category: "upload",
-  },
-  {
-    key: "resizerHost",
-    type: "url",
-    label: "Resizer Host",
-    description: "Image Resize Host to resize images",
-    placeholder: "https://resizer.example.com",
-    category: "other",
-  },
-  {
-    key: "pageSize",
+    description: "Delay between retries in milliseconds",
+    key: "uploadRetryDelay",
+    label: "Upload Retry Delay",
     type: "number",
-    label: "Page Size",
-    description: "Number of items per page",
-    defaultValue: 500,
-    category: "display",
   },
   {
-    key: "splitFileSize",
-    type: "select",
-    label: "Split File Size",
-    description: "Split File Size for multipart uploads",
-    options: splitFileSizes,
-    defaultValue: splitFileSizes[1].value,
-    category: "upload",
-  },
-  {
-    key: "encryptFiles",
-    type: "switch",
-    label: "Encrypt Files",
-    description: "Encrypt Files before uploading",
-    defaultValue: false,
-    category: "upload",
-  },
-  {
-    key: "randomChunking",
-    type: "switch",
-    label: "Random Chunking",
-    description: "Randomize Names of File Chunks",
-    defaultValue: true,
-    category: "upload",
-  },
-  {
-    key: "rcloneProxy",
-    type: "url",
-    label: "Rclone Media Proxy",
-    description: "Play Files directly from Rclone Webdav",
-    placeholder: "http://localhost:8080",
     category: "other",
+    description: "Image Resize Host to resize images",
+    key: "resizerHost",
+    label: "Resizer Host",
+    placeholder: "https://resizer.example.com",
+    type: "url",
+  },
+  {
+    category: "display",
+    defaultValue: 500,
+    description: "Number of items per page",
+    key: "pageSize",
+    label: "Page Size",
+    type: "number",
+  },
+  {
+    category: "upload",
+    defaultValue: splitFileSizes[1].value,
+    description: "Split File Size for multipart uploads",
+    key: "splitFileSize",
+    label: "Split File Size",
+    options: splitFileSizes,
+    type: "select",
+  },
+  {
+    category: "upload",
+    defaultValue: false,
+    description: "Encrypt Files before uploading",
+    key: "encryptFiles",
+    label: "Encrypt Files",
+    type: "switch",
+  },
+  {
+    category: "upload",
+    defaultValue: true,
+    description: "Randomize Names of File Chunks",
+    key: "randomChunking",
+    label: "Random Chunking",
+    type: "switch",
+  },
+  {
+    category: "other",
+    description: "Play Files directly from Rclone Webdav",
+    key: "rcloneProxy",
+    label: "Rclone Media Proxy",
+    placeholder: "http://localhost:8080",
+    type: "url",
   },
 ];
 
@@ -155,20 +155,20 @@ export function getSettingsValues(): Settings {
 }
 
 export const categoryConfig = {
-  upload: {
-    title: "Uploads",
-    description: "Configure upload behavior",
-  },
   display: {
-    title: "Display",
     description: "Customize how content is displayed",
-  },
-  security: {
-    title: "Security",
-    description: "Configure security options",
+    title: "Display",
   },
   other: {
-    title: "Other",
     description: "Other Options",
+    title: "Other",
+  },
+  security: {
+    description: "Configure security options",
+    title: "Security",
+  },
+  upload: {
+    description: "Configure upload behavior",
+    title: "Uploads",
   },
 } as const;

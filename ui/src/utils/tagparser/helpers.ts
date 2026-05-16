@@ -29,7 +29,7 @@ function unpackBytes(bytes: Uint8Array, options: Partial<Options>) {
   return value;
 }
 
-function decode(bytes: Uint8Array, encoding = "utf-8") {
+function decode(bytes: Uint8Array, encoding = "utf8") {
   const decoder = new TextDecoder(encoding);
 
   return decoder.decode(bytes);

@@ -2,13 +2,13 @@ import { useCallback } from "react";
 import type { FileListParams, Session, ShareListParams } from "@/types";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  defineFileAction,
-  FbActions,
   type FbActionUnion,
+  FbActions,
   FbIconName,
+  type FileData,
   FileHelper,
   type MapFileActionsToData,
-  type FileData,
+  defineFileAction,
 } from "file-browser";
 import IconFlatColorIconsVlc from "~icons/flat-color-icons/vlc";
 import IconPotPlayerIcon from "~icons/material-symbols/play-circle-rounded";
@@ -19,7 +19,7 @@ import {
   navigateToExternalUrl,
   sharedMediaUrl,
 } from "@/utils/common";
-import { getSortState, SortOrder } from "@/utils/defaults";
+import { SortOrder, getSortState } from "@/utils/defaults";
 import { useFileUploadStore, useModalStore } from "@/utils/stores";
 import Share from "~icons/fluent/share-24-regular";
 import MaterialSymbolsFolder from "~icons/material-symbols/folder";
@@ -27,58 +27,56 @@ import { useNavigate } from "@tanstack/react-router";
 import { $api } from "@/utils/api";
 
 export const CustomActions = {
-  OpenInVLCPlayer: defineFileAction({
-    id: "open_vlc_player",
-    requiresSelection: true,
-    fileFilter: (file) => file?.previewType === "video",
-    button: {
-      name: "VLC",
-      toolbar: true,
-      group: "OpenOptions",
-      icon: IconFlatColorIconsVlc,
-    },
-  } as const),
-  OpenInPotPlayer: defineFileAction({
-    id: "open_pot_player",
-    requiresSelection: true,
-    fileFilter: (file) => file?.previewType === "video",
-    button: {
-      name: "PotPlayer",
-      toolbar: true,
-      group: "OpenOptions",
-      icon: IconPotPlayerIcon,
-    },
-  } as const),
-  ShareFiles: defineFileAction({
-    id: "share_files",
-    requiresSelection: true,
-    button: {
-      name: "Share",
-      contextMenu: true,
-      icon: Share,
-    },
-  } as const),
-
   CopyDownloadLink: defineFileAction({
-    id: "copy_link",
-    requiresSelection: true,
-    fileFilter: (file) => !(file && "isDir" in file),
     button: {
-      name: "Copy Link",
       contextMenu: true,
       icon: FbIconName.copy,
+      name: "Copy Link",
     },
+    fileFilter: (file) => !(file && "isDir" in file),
+    id: "copy_link",
+    requiresSelection: true,
   } as const),
-
-  UploadFolder: defineFileAction({
-    id: "upload_folder",
-    requiresSelection: false,
+  OpenInPotPlayer: defineFileAction({
     button: {
+      group: "OpenOptions",
+      icon: IconPotPlayerIcon,
+      name: "PotPlayer",
+      toolbar: true,
+    },
+    fileFilter: (file) => file?.previewType === "video",
+    id: "open_pot_player",
+    requiresSelection: true,
+  } as const),
+  OpenInVLCPlayer: defineFileAction({
+    button: {
+      group: "OpenOptions",
+      icon: IconFlatColorIconsVlc,
+      name: "VLC",
+      toolbar: true,
+    },
+    fileFilter: (file) => file?.previewType === "video",
+    id: "open_vlc_player",
+    requiresSelection: true,
+  } as const),
+  ShareFiles: defineFileAction({
+    button: {
+      contextMenu: true,
+      icon: Share,
+      name: "Share",
+    },
+    id: "share_files",
+    requiresSelection: true,
+  } as const),
+  UploadFolder: defineFileAction({
+    button: {
+      group: "Add",
+      icon: MaterialSymbolsFolder,
       name: "Upload Folder",
       toolbar: true,
-      icon: MaterialSymbolsFolder,
-      group: "Add",
     },
+    id: "upload_folder",
+    requiresSelection: false,
   } as const),
 };
 
@@ -108,8 +106,7 @@ export const useFileAction = (
 
   const moveFiles = $api.useMutation("post", "/files/move");
 
-  return useCallback(() => {
-    return async (data: MapFileActionsToData<FbActionFullUnion>) => {
+  return useCallback(() => async (data: MapFileActionsToData<FbActionFullUnion>) => {
       switch (data.id) {
         case FbActions.OpenFiles.id: {
           const { targetFile, files } = data.payload;
@@ -122,28 +119,28 @@ export const useFileAction = (
             if (view === "my-drive") {
               const basePath = search?.path ?? "/";
               qparams = {
-                view,
                 params: {
                   path: fileToOpen.chain
                     ? fileToOpen.path
                     : `${basePath === "/" ? "" : basePath}/${fileToOpen.name}`,
                 },
+                view,
               };
             } else {
               qparams = {
-                view: "browse",
                 params: { parentId: fileToOpen.id },
+                view: "browse",
               };
             }
             navigate({
-              to: "/$view",
               params: { view: qparams.view },
               search: qparams.params,
+              to: "/$view",
             });
           } else if (fileToOpen && FileHelper.isOpenable(fileToOpen)) {
             actions.set({
-              open: true,
               currentFile: fileToOpen,
+              open: true,
               operation: FbActions.OpenFiles.id,
             });
           }
@@ -185,8 +182,8 @@ export const useFileAction = (
         }
         case FbActions.RenameFile.id: {
           actions.set({
-            open: true,
             currentFile: data.state.selectedFiles[0],
+            open: true,
             operation: FbActions.RenameFile.id,
           });
           break;
@@ -194,25 +191,25 @@ export const useFileAction = (
         case FbActions.DeleteFiles.id: {
           actions.set({
             open: true,
-            selectedFiles: data.state.selectedFiles.map((item) => item.id),
             operation: FbActions.DeleteFiles.id,
+            selectedFiles: data.state.selectedFiles.map((item) => item.id),
           });
           break;
         }
         case FbActions.CreateFolder.id: {
           actions.set({
+            currentFile: {} as FileData,
             open: true,
             operation: FbActions.CreateFolder.id,
-            currentFile: {} as FileData,
           });
           break;
         }
 
         case CustomActions.ShareFiles.id: {
           actions.set({
+            currentFile: data.state.selectedFiles[0],
             open: true,
             operation: CustomActions.ShareFiles.id,
-            currentFile: data.state.selectedFiles[0],
           });
           break;
         }
@@ -233,8 +230,8 @@ export const useFileAction = (
           moveFiles
             .mutateAsync({
               body: {
-                ids: files.map((file) => file?.id!),
                 destinationParent: target.path || "/",
+                ids: files.map((file) => file?.id!),
               },
             })
             .then(() => {
@@ -275,7 +272,7 @@ export const useFileAction = (
                 : SortOrder.ASC;
             localStorage.setItem(
               "sort",
-              JSON.stringify({ sortId: data.id, order }),
+              JSON.stringify({ order, sortId: data.id }),
             );
           }
           break;
@@ -283,15 +280,13 @@ export const useFileAction = (
         default:
           break;
       }
-    };
-  }, [view, search?.path]);
+    }, [view, search?.path]);
 };
 
 export const useShareFileAction = (params: ShareListParams) => {
   const actions = useModalStore((state) => state.actions);
   const navigate = useNavigate();
-  return useCallback(() => {
-    return async (data: MapFileActionsToData<FbActionFullUnion>) => {
+  return useCallback(() => async (data: MapFileActionsToData<FbActionFullUnion>) => {
       switch (data.id) {
         case FbActions.OpenFiles.id: {
           const { targetFile, files } = data.payload;
@@ -301,7 +296,6 @@ export const useShareFileAction = (params: ShareListParams) => {
           if (fileToOpen && FileHelper.isDirectory(fileToOpen)) {
             const basePath = params?.path ?? "/";
             navigate({
-              to: "/share/$id",
               params: {
                 id: params.id,
               },
@@ -310,11 +304,12 @@ export const useShareFileAction = (params: ShareListParams) => {
                   ? fileToOpen.path
                   : `${basePath === "/" ? "" : basePath}/${fileToOpen.name}`,
               },
+              to: "/share/$id",
             });
           } else if (fileToOpen && FileHelper.isOpenable(fileToOpen)) {
             actions.set({
-              open: true,
               currentFile: fileToOpen,
+              open: true,
               operation: FbActions.OpenFiles.id,
             });
           }
@@ -367,15 +362,12 @@ export const useShareFileAction = (params: ShareListParams) => {
         default:
           break;
       }
-    };
-  }, [params.path, params.id]);
+    }, [params.path, params.id]);
 };
 
-export const fileActions = [
-  ...Object.keys(CustomActions).map(
+export const fileActions = Object.keys(CustomActions).map(
     (t) => CustomActions[t as keyof typeof CustomActions],
-  ),
-];
+  );
 
 export const sharefileActions = Object.keys(CustomActions)
   .map((t) => CustomActions[t as keyof typeof CustomActions])

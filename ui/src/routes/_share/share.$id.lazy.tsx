@@ -55,17 +55,17 @@ function ShareAccess({ id, setUnlocked, setShareUnlocked }: ShareAccessProps) {
   const togglePassword = () => setShowPassword((prev) => !prev);
 
   const unLockMutation = $api.useMutation("post", "/shares/{id}/unlock", {
+    onError: () => {
+      setError("password", { message: "Invalid password" });
+    },
     onSuccess: () => {
       setShareUnlocked(true);
       setUnlocked(true);
     },
-    onError: () => {
-      setError("password", { message: "Invalid password" });
-    },
   });
 
   const onSubmit = useCallback(async ({ password }: { password: string }) => {
-    await unLockMutation.mutateAsync({ params: { path: { id } }, body: { password } });
+    await unLockMutation.mutateAsync({ body: { password }, params: { path: { id } } });
   }, [id, unLockMutation]);
 
   return (
@@ -84,7 +84,7 @@ function ShareAccess({ id, setUnlocked, setShareUnlocked }: ShareAccessProps) {
         rules={{ required: true }}
         render={({ field, fieldState: { error } }) => (
           <TextField
-            isInvalid={!!error}
+            isInvalid={Boolean(error)}
             className="max-w-xs"
             name={field.name}
             value={field.value}

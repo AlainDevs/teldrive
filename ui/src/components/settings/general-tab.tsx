@@ -3,7 +3,7 @@ import { scrollbarClasses } from "@/utils/classes";
 import clsx from "clsx";
 import { Button } from "@heroui/react";
 
-import { generalSettingsConfig, categoryConfig } from "@/config/settings";
+import { categoryConfig, generalSettingsConfig } from "@/config/settings";
 import { SettingsField } from "./settings-field";
 import { useSettingsStore } from "@/utils/stores/settings";
 
@@ -13,9 +13,9 @@ import IcBaselineTv from "~icons/ic/baseline-tv";
 import IcBaselineRestore from "~icons/ic/baseline-restore";
 
 const iconMap: Record<string, React.ElementType> = {
-  upload: IcBaselineCloudUpload,
   display: IcBaselineTv,
   other: IcBaselineSettings,
+  upload: IcBaselineCloudUpload,
 };
 
 export const GeneralTab = memo(() => {
@@ -38,7 +38,7 @@ export const GeneralTab = memo(() => {
     <div className={clsx("flex flex-col gap-6 p-4 h-full overflow-y-auto", scrollbarClasses)}>
       {categories.map((category) => {
         const fields = generalSettingsConfig.filter((f) => f.category === category);
-        if (fields.length === 0) return null;
+        if (fields.length === 0) {return null;}
 
         const catConfig = categoryConfig[category];
         const Icon = iconMap[category] || IcBaselineSettings;

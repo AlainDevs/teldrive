@@ -26,8 +26,7 @@ export const uploadChunk = <T extends {}>(
   params: UploadParams,
   signal: AbortSignal,
   onProgress: (progress: number) => void,
-) => {
-  return new Promise<T>((resolve, reject) => {
+) => new Promise<T>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 
     const uploadUrl = new URL(url);
@@ -59,7 +58,6 @@ export const uploadChunk = <T extends {}>(
     };
     xhr.send(body);
   });
-};
 
 export const uploadFile = async (
   file: File,
@@ -83,13 +81,13 @@ export const uploadFile = async (
     const res = (
       await fetchClient.GET("/files", {
         params: {
-          query: { path, name: fileName, operation: "find" },
+          query: { name: fileName, operation: "find", path },
         },
       })
     ).data;
 
     if (res && res.items.length > 0) {
-      throw Error("file exists");
+      throw new Error("file exists");
     }
   }
 
@@ -116,7 +114,7 @@ export const uploadFile = async (
   let channelId = 0;
 
   if (uploadedParts.length > 0) {
-    channelId = uploadedParts[0].channelId;
+    ({ channelId } = uploadedParts[0]);
   }
 
   const partUploadPromises: Promise<components["schemas"]["UploadPart"]>[] = [];
@@ -142,16 +140,16 @@ export const uploadFile = async (
 
           const partName = randomChunking
             ? md5(generateUUID())
-            : totalParts > 1
+            : (totalParts > 1
               ? `${fileName}.part.${zeroPad(partIndex + 1, 3)}`
-              : fileName;
+              : fileName);
 
           const params = {
-            partName,
-            fileName,
-            partNo: partIndex + 1,
-            encrypted: encyptFile,
             channelId,
+            encrypted: encyptFile,
+            fileName,
+            partName,
+            partNo: partIndex + 1,
           } as const;
 
           let retryCount = 0;
@@ -208,18 +206,18 @@ export const uploadFile = async (
 
     const uploadParts = uploadedParts
       .concat(parts)
-      .sort((a, b) => a.partNo - b.partNo)
+      .toSorted((a, b) => a.partNo - b.partNo)
       .map((item) => ({ id: item.partId, salt: item.salt }));
 
     const payload = {
-      name: fileName,
-      mimeType: file.type ?? "application/octet-stream",
-      type: "file",
-      parts: uploadParts,
-      size: file.size,
-      path: path ? path : "/",
-      encrypted: encyptFile,
       channelId,
+      encrypted: encyptFile,
+      mimeType: file.type ?? "application/octet-stream",
+      name: fileName,
+      parts: uploadParts,
+      path: path ? path : "/",
+      size: file.size,
+      type: "file",
     } as const;
 
     await onCreate(payload);

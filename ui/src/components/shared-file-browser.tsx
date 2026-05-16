@@ -73,11 +73,11 @@ export const SharedFileBrowser = memo(() => {
       return [];
     }
     return chainSharedLinks(name, params.path!).map(([name, path], index) => ({
+      chain: true,
       id: index + name,
+      isDir: true,
       name,
       path,
-      isDir: true,
-      chain: true,
     }));
   }, [params.path, name, type]);
 
@@ -93,8 +93,8 @@ export const SharedFileBrowser = memo(() => {
 
     setTimeout(() => {
       listRef.current?.scrollTo({
-        top: positions.get(id + path)?.scrollTop ?? 0,
         left: 0,
+        top: positions.get(id + path)?.scrollTop ?? 0,
       });
     }, 0);
 

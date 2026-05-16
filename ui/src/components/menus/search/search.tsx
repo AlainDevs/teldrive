@@ -20,7 +20,7 @@ import IconIcBaselineHistory from "~icons/ic/baseline-history";
 import IconMaterialSymbolsClose from "~icons/material-symbols/close";
 import clsx from "clsx";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useLocalStorage } from "usehooks-ts";
 
 import { scrollbarClasses } from "@/utils/classes";
@@ -37,13 +37,13 @@ const getCurrentDateFormatted = () => {
 };
 
 const categories = [
-  { value: "archive", icon: IconFaSolidFileArchive },
-  { value: "audio", icon: IconIconamoonMusic1Bold },
-  { value: "image", icon: IconFaSolidFileImage },
-  { value: "video", icon: IconFa6SolidFileVideo },
-  { value: "document", icon: IconFaSolidFilePdf },
-  { value: "folder", icon: IconIcOutlineFolderOpen },
-  { value: "other", icon: IconFaSolidFile },
+  { icon: IconFaSolidFileArchive, value: "archive" },
+  { icon: IconIconamoonMusic1Bold, value: "audio" },
+  { icon: IconFaSolidFileImage, value: "image" },
+  { icon: IconFa6SolidFileVideo, value: "video" },
+  { icon: IconFaSolidFilePdf, value: "document" },
+  { icon: IconIcOutlineFolderOpen, value: "folder" },
+  { icon: IconFaSolidFile, value: "other" },
 ];
 
 const searchTypes = ["text", "regex"];
@@ -51,10 +51,10 @@ const searchTypes = ["text", "regex"];
 const locations = ["current", "custom"];
 
 const modifiedDateValues = [
-  { value: "7", label: "Last 7 days" },
-  { value: "30", label: "Last 30 days" },
-  { value: "90", label: "Last 90 days" },
-  { value: "-2", label: "Custom" },
+  { label: "Last 7 days", value: "7" },
+  { label: "Last 30 days", value: "30" },
+  { label: "Last 90 days", value: "90" },
+  { label: "Custom", value: "-2" },
 ];
 
 interface SearchMenuProps {
@@ -64,14 +64,14 @@ interface SearchMenuProps {
 
 const defaultFilters = {
   category: [] as string[],
+  deepSearch: false,
+  fromDate: "",
   location: "",
   modifiedDate: "",
-  query: "",
-  fromDate: "",
-  toDate: "",
   path: "",
-  deepSearch: false,
+  query: "",
   searchType: "text",
+  toDate: "",
 };
 
 export const SearchMenu = memo(({ isOpen, setIsOpen }: SearchMenuProps) => {
@@ -137,11 +137,11 @@ export const SearchMenu = memo(({ isOpen, setIsOpen }: SearchMenuProps) => {
         }
       }
       const nextRoute: NavigateOptions = {
-        to: "/$view",
-        search: filterQuery,
         params: {
           view: "search",
         },
+        search: filterQuery,
+        to: "/$view",
       };
 
       if (Object.keys(filterQuery).length === 0) {

@@ -41,8 +41,8 @@ const validateBots = (value?: string) => {
 const formatDate = (date: string) => {
   const d = new Date(date);
   return d.toLocaleDateString(undefined, {
-    month: "short",
     day: "numeric",
+    month: "short",
     year: "numeric",
   });
 };
@@ -177,8 +177,7 @@ const BotRemoveDialog = ({
 }: {
   handleClose: () => void;
   onRemove: () => void;
-}) => {
-  return (
+}) => (
     <>
       <Modal.Header className="flex flex-col gap-1">
         <Modal.Heading>Remove All Bots</Modal.Heading>
@@ -205,7 +204,6 @@ const BotRemoveDialog = ({
       </Modal.Footer>
     </>
   );
-};
 
 const ChannelDeleteDialog = ({
   channelId,
@@ -274,17 +272,15 @@ interface BotOperationProps {
 }
 
 const BotOperationModal = memo(
-  ({ open, handleClose, onRemove }: BotOperationProps) => {
-    return (
-      <Modal.Backdrop isOpen={open} onOpenChange={(isOpen) => { if (!isOpen) handleClose(); }}>
+  ({ open, handleClose, onRemove }: BotOperationProps) => (
+      <Modal.Backdrop isOpen={open} onOpenChange={(isOpen) => { if (!isOpen) {handleClose();} }}>
         <Modal.Container>
           <Modal.Dialog>
             <BotRemoveDialog handleClose={handleClose} onRemove={onRemove} />
           </Modal.Dialog>
         </Modal.Container>
       </Modal.Backdrop>
-    );
-  },
+    ),
 );
 
 const ChannelOperationModal = memo(
@@ -305,7 +301,7 @@ const ChannelOperationModal = memo(
       }
     };
     return (
-      <Modal.Backdrop isOpen={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
+      <Modal.Backdrop isOpen={open} onOpenChange={(o) => { if (!o) {handleClose();} }}>
         <Modal.Container>
           <Modal.Dialog>
             {renderOperation()}
@@ -331,13 +327,13 @@ export const AccountTab = memo(() => {
     });
 
   const removeBots = $api.useMutation("delete", "/users/bots", {
+    onError: () => {
+      toast.error("Failed to remove bots");
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["get", "/users/config"] });
       toast.success("All bots removed");
       setBotOpen(false);
-    },
-    onError: () => {
-      toast.error("Failed to remove bots");
     },
   });
 
@@ -346,10 +342,6 @@ export const AccountTab = memo(() => {
   }, []);
 
   const syncChannels = $api.useMutation("patch", "/users/channels/sync", {
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["get", "/users/channels"] });
-      toast.success("Channels Synced");
-    },
     onError: async (error) => {
       if (error instanceof NetworkError) {
         const errorData =
@@ -360,6 +352,10 @@ export const AccountTab = memo(() => {
       } else {
         toast.error("Sync failed: An unknown error occurred.");
       }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["get", "/users/channels"] });
+      toast.success("Channels Synced");
     },
   });
 
@@ -374,10 +370,6 @@ export const AccountTab = memo(() => {
   }, [userConfig?.bots]);
 
   const botAddition = $api.useMutation("post", "/users/bots", {
-    onSuccess: () => {
-      toast.success("bots added");
-      queryClient.invalidateQueries({ queryKey: ["get", "/users/config"] });
-    },
     onError: async (error) => {
       if (error instanceof NetworkError) {
         const errorData =
@@ -385,13 +377,13 @@ export const AccountTab = memo(() => {
         toast.error(errorData.message.split(":").slice(-1)[0]!.trim());
       }
     },
+    onSuccess: () => {
+      toast.success("bots added");
+      queryClient.invalidateQueries({ queryKey: ["get", "/users/config"] });
+    },
   });
 
   const updateChannel = $api.useMutation("patch", "/users/channels", {
-    onSuccess: () => {
-      toast.success("Default channel updated");
-      queryClient.invalidateQueries({ queryKey: ["get", "/users/config"] });
-    },
     onError: async (error) => {
       if (error instanceof NetworkError) {
         const errorData =
@@ -404,6 +396,10 @@ export const AccountTab = memo(() => {
           "Failed to update default channel: An unknown error occurred.",
         );
       }
+    },
+    onSuccess: () => {
+      toast.success("Default channel updated");
+      queryClient.invalidateQueries({ queryKey: ["get", "/users/config"] });
     },
   });
 

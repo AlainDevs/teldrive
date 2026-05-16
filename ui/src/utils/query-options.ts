@@ -11,7 +11,6 @@ import { fetchClient } from "./api";
 import { useSettingsStore } from "./stores/settings";
 
 export const sessionOptions = queryOptions({
-  queryKey: ["session"],
   queryFn: async ({ signal }) => {
     try {
       const res = await fetchClient.GET("/auth/session", {
@@ -28,21 +27,22 @@ export const sessionOptions = queryOptions({
       throw error;
     }
   },
+  queryKey: ["session"],
 });
 
 export const useSession = () => {
   const { data, isLoading, refetch } = useQuery(sessionOptions);
-  const status = isLoading ? "loading" : data?.userId ? "success" : "unauthenticated";
+  const status = isLoading ? "loading" : (data?.userId ? "success" : "unauthenticated");
   return [data ?? null, status, refetch] as const;
 };
 
 export const fileQueries = {
   list: (params: FileListParams, sessionHash?: string) =>
     infiniteQueryOptions({
-      queryKey: ["Files_list", params.view, params.params],
-      queryFn: fetchFiles(params),
-      initialPageParam: undefined as string | undefined,
       getNextPageParam: (lastPage) => lastPage?.meta.nextCursor || undefined,
+      initialPageParam: undefined as string | undefined,
+      queryFn: fetchFiles(params),
+      queryKey: ["Files_list", params.view, params.params],
       select: (data) =>
         data.pages.flatMap((page) =>
           page?.items ? mapFilesToFb(page?.items!, sessionHash as string) : [],
@@ -53,7 +53,8 @@ export const fileQueries = {
 export const shareQueries = {
   list: (params: ShareListParams) =>
     infiniteQueryOptions({
-      queryKey: ["Shares_listFiles", params],
+      getNextPageParam: (lastPage) => lastPage?.meta.nextCursor || undefined,
+      initialPageParam: undefined as string | undefined,
       queryFn: async ({ pageParam, signal }) =>
         (
           await fetchClient.GET("/shares/{id}/files", {
@@ -67,8 +68,7 @@ export const shareQueries = {
             signal,
           })
         ).data,
-      initialPageParam: undefined as string | undefined,
-      getNextPageParam: (lastPage) => lastPage?.meta.nextCursor || undefined,
+      queryKey: ["Shares_listFiles", params],
       select: (data) =>
         data.pages.flatMap((page) => (page?.items ? mapFilesToFb(page?.items, "") : [])),
     }),
@@ -121,17 +121,16 @@ const fetchFiles =
     ).data;
   };
 
-const mapFilesToFb = (files: components["schemas"]["FileList"]["items"], sessionHash: string) => {
-  return files.map((item): FileData => {
+const mapFilesToFb = (files: components["schemas"]["FileList"]["items"], sessionHash: string) => files.map((item): FileData => {
     if (item.mimeType === "drive/folder") {
       return {
         id: item.id!,
-        name: item.name,
-        type: item.type,
-        mimeType: item.mimeType,
-        size: item.size ? Number(item.size) : 0,
-        modDate: item.updatedAt,
         isDir: true,
+        mimeType: item.mimeType,
+        modDate: item.updatedAt,
+        name: item.name,
+        size: item.size ? Number(item.size) : 0,
+        type: item.type,
       };
     }
 
@@ -152,15 +151,14 @@ const mapFilesToFb = (files: components["schemas"]["FileList"]["items"], session
     }
     return {
       id: item.id!,
-      name: item.name,
-      type: item.type,
-      mimeType: item.mimeType,
-      size: item.size ? Number(item.size) : 0,
-      previewType,
-      openable: !!preview[previewType!],
-      thumbnailUrl,
-      modDate: item.updatedAt,
       isEncrypted: item.encrypted,
+      mimeType: item.mimeType,
+      modDate: item.updatedAt,
+      name: item.name,
+      openable: !!preview[previewType!],
+      previewType,
+      size: item.size ? Number(item.size) : 0,
+      thumbnailUrl,
+      type: item.type,
     };
   });
-};

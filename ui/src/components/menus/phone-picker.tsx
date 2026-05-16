@@ -2,15 +2,15 @@ import { memo, useMemo, useState } from "react";
 import { useFilter } from "@react-aria/i18n";
 import {
   Button,
-  Separator,
   Input,
   ListBox,
   Popover,
+  Separator,
 } from "@heroui/react";
 import clsx from "clsx";
 import type { ControllerRenderProps } from "react-hook-form";
 
-import { isoCodeMap, isoCodes, type FormState } from "@/components/login";
+import { type FormState, isoCodeMap, isoCodes } from "@/components/login";
 import { scrollbarClasses } from "@/utils/classes";
 import { flags } from "@/utils/country-flags";
 

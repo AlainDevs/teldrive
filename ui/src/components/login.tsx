@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useSearch } from "@tanstack/react-router";
 import { Button, Input, InputGroup, Label, Spinner, TextField } from "@heroui/react";
-import { AsYouType, getPhoneCode, type CountryCode } from "libphonenumber-js";
+import { AsYouType, type CountryCode, getPhoneCode } from "libphonenumber-js";
 import meta from "libphonenumber-js/metadata.min.json";
 import { Controller, useForm } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -14,20 +14,20 @@ import { PhoneNoPicker } from "./menus/phone-picker";
 import { getCountryCode } from "@/utils/common";
 import { $api, fetchClient } from "@/utils/api";
 
-type AuthAttemptSession = {
+interface AuthAttemptSession {
   name: string;
   userName: string;
   userId: number;
   isPremium: boolean;
   session: string;
-};
+}
 
 const getKeys = Object.keys as <T>(object: T) => (keyof T)[];
 
 export const displayNames = new Intl.DisplayNames(["en"], { type: "region" });
 
 function sortISOCodes(countryCodes: CountryCode[]) {
-  return [...countryCodes].sort((countryCodeA, countryCodeB) => {
+  return [...countryCodes].toSorted((countryCodeA, countryCodeB) => {
     const countryA = displayNames.of(countryCodeA) as string;
     const countryB = displayNames.of(countryCodeB) as string;
 
@@ -63,17 +63,17 @@ function getTypedNumber(value: string, defaultCountryCode = "IN") {
   return value;
 }
 
-export type FormState = {
+export interface FormState {
   otpCodeHash?: string;
   otpCode: string;
   phoneNumber: string;
   phoneCode: CountryCode;
   password?: string;
-};
+}
 
 type LoginType = "qr" | "phone";
 
-type AuthAttemptSnapshot = {
+interface AuthAttemptSnapshot {
   id: string;
   authType?: LoginType;
   state: "created" | "qr_pending" | "code_sent" | "password_required" | "authenticated" | "failed" | "expired";
@@ -81,26 +81,26 @@ type AuthAttemptSnapshot = {
   phoneCodeHash?: string;
   session?: AuthAttemptSession;
   message?: string;
-};
+}
 
-type StoredAttempt = {
+interface StoredAttempt {
   id: string;
   loginType: LoginType;
   phoneNumber?: string;
   phoneCode?: CountryCode;
-};
+}
 
-type ActiveAttempt = {
+interface ActiveAttempt {
   id: string;
   stored?: StoredAttempt | null;
-};
+}
 
 const authAttemptStorageKey = "teldrive.auth.attempt";
 
 function readStoredAttempt(): StoredAttempt | null {
   try {
     const raw = window.sessionStorage.getItem(authAttemptStorageKey);
-    if (!raw) return null;
+    if (!raw) {return null;}
     return JSON.parse(raw) as StoredAttempt;
   } catch {
     return null;
@@ -116,14 +116,14 @@ function clearStoredAttempt() {
 }
 
 const initialState = {
-  loginType: "phone" as LoginType,
-  qrCode: "",
-  step: 1,
-  isLoading: false,
   form: {
     phoneCode: getCountryCode(),
     phoneNumber: "",
   } as FormState,
+  isLoading: false,
+  loginType: "phone" as LoginType,
+  qrCode: "",
+  step: 1,
 };
 
 export const Login = memo(() => {
@@ -148,26 +148,26 @@ export const Login = memo(() => {
     if (attempt.state === "code_sent" && attempt.phoneCodeHash) {
       setState((prev) => ({
         ...prev,
-        isLoading: false,
-        step: 2,
         form: {
           ...prev.form,
           otpCodeHash: attempt.phoneCodeHash,
-          phoneNumber: stored?.phoneNumber || prev.form.phoneNumber,
           phoneCode: stored?.phoneCode || prev.form.phoneCode,
+          phoneNumber: stored?.phoneNumber || prev.form.phoneNumber,
         },
+        isLoading: false,
+        step: 2,
       }));
     }
     if (attempt.state === "password_required") {
       setState((prev) => ({
         ...prev,
-        isLoading: false,
-        step: 3,
         form: {
           ...prev.form,
-          phoneNumber: stored?.phoneNumber || prev.form.phoneNumber,
           phoneCode: stored?.phoneCode || prev.form.phoneCode,
+          phoneNumber: stored?.phoneNumber || prev.form.phoneNumber,
         },
+        isLoading: false,
+        step: 3,
       }));
     }
     if (attempt.state === "authenticated" && attempt.session) {
@@ -177,7 +177,7 @@ export const Login = memo(() => {
       loginAttemptRef.current = attempt.id;
       setActiveAttempt(null);
       submitLogin({ body: attempt.session as never }).finally(() => {
-        // window.location.replace(new URL(redirect || "/", window.location.origin));
+        // Window.location.replace(new URL(redirect || "/", window.location.origin));
       });
       return;
     }
@@ -202,8 +202,7 @@ export const Login = memo(() => {
   }, [redirect, setError, submitLogin]);
 
   const attemptQuery = useQuery({
-    queryKey: ["auth-attempt", activeAttempt?.id],
-    enabled: !!activeAttempt?.id,
+    enabled: Boolean(activeAttempt?.id),
     queryFn: async () => {
       const { data, error } = await fetchClient.GET("/auth/attempts/{id}", {
         params: { path: { id: activeAttempt!.id } },
@@ -213,10 +212,11 @@ export const Login = memo(() => {
       }
       return data as AuthAttemptSnapshot;
     },
+    queryKey: ["auth-attempt", activeAttempt?.id],
     refetchInterval: (query) => {
       const attempt = query.state.data as AuthAttemptSnapshot | undefined;
-      if (!activeAttempt?.id) return false;
-      if (!attempt) return 1000;
+      if (!activeAttempt?.id) {return false;}
+      if (!attempt) {return 1000;}
       return ["authenticated", "failed", "expired"].includes(attempt.state) ? false : 1000;
     },
     refetchIntervalInBackground: false,
@@ -248,7 +248,7 @@ export const Login = memo(() => {
     attemptIdRef.current = null;
     loginAttemptRef.current = null;
     clearStoredAttempt();
-    if (!id) return;
+    if (!id) {return;}
     await fetchClient.DELETE("/auth/attempts/{id}", {
       params: { path: { id } },
     }).catch(() => undefined);
@@ -262,10 +262,10 @@ export const Login = memo(() => {
     setActiveAttempt(null);
     setState((prev) => ({
       ...prev,
+      form: { ...prev.form, otpCode: "", otpCodeHash: undefined, password: undefined },
+      isLoading: false,
       qrCode: "",
       step: 1,
-      isLoading: false,
-      form: { ...prev.form, otpCodeHash: undefined, password: undefined, otpCode: "" },
     }));
 
     const startAttempt = async () => {
@@ -281,8 +281,8 @@ export const Login = memo(() => {
             ...prev,
             form: {
               ...prev.form,
-              phoneNumber: stored.phoneNumber || prev.form.phoneNumber,
               phoneCode: stored.phoneCode || prev.form.phoneCode,
+              phoneNumber: stored.phoneNumber || prev.form.phoneNumber,
             },
           }));
           applyAttemptSnapshot(data as AuthAttemptSnapshot, stored);
@@ -334,8 +334,8 @@ export const Login = memo(() => {
       if (state.step === 1 && state.loginType === "phone") {
         setState((prev) => ({
           ...prev,
+          form: { ...prev.form, phoneCode, phoneNumber },
           isLoading: true,
-          form: { ...prev.form, phoneNumber, phoneCode },
         }));
         await cleanupAttempt();
         const { data, error } = await fetchClient.POST("/auth/attempts", {
@@ -350,7 +350,7 @@ export const Login = memo(() => {
           return;
         }
         attemptIdRef.current = data.id;
-        const stored = { id: data.id, loginType: "phone" as const, phoneNumber, phoneCode };
+        const stored = { id: data.id, loginType: "phone" as const, phoneCode, phoneNumber };
         writeStoredAttempt(stored);
         setActiveAttempt({ id: data.id, stored });
         applyAttemptSnapshot(data as AuthAttemptSnapshot, stored);
@@ -365,12 +365,12 @@ export const Login = memo(() => {
           isLoading: true,
         }));
         await fetchClient.POST("/auth/attempts/{id}/phone/sign-in", {
-          params: { path: { id: attemptId } },
           body: {
-            phoneNo: `+${getPhoneCode(phoneCode)}${phoneNumber}`,
             phoneCode: otpCode,
             phoneCodeHash: state.form.otpCodeHash || "",
+            phoneNo: `+${getPhoneCode(phoneCode)}${phoneNumber}`,
           },
+          params: { path: { id: attemptId } },
         }).catch(() => {
           setState((prev) => ({ ...prev, isLoading: false }));
           toast.error("Failed to sign in");
@@ -386,8 +386,8 @@ export const Login = memo(() => {
           isLoading: true,
         }));
         await fetchClient.POST("/auth/attempts/{id}/password", {
-          params: { path: { id: attemptId } },
           body: { password: password || "" },
+          params: { path: { id: attemptId } },
         }).catch(() => {
           setState((prev) => ({ ...prev, isLoading: false }));
           toast.error("Failed to verify password");
@@ -404,13 +404,13 @@ export const Login = memo(() => {
 
   useEffect(() => {
     const attemptId = attemptIdRef.current;
-    if (!attemptId || state.loginType !== "phone") return;
+    if (!attemptId || state.loginType !== "phone") {return;}
     const stored = readStoredAttempt();
-    if (!stored || stored.id !== attemptId) return;
+    if (!stored || stored.id !== attemptId) {return;}
     writeStoredAttempt({
       ...stored,
-      phoneNumber: state.form.phoneNumber,
       phoneCode: state.form.phoneCode,
+      phoneNumber: state.form.phoneNumber,
     });
   }, [state.form.phoneCode, state.form.phoneNumber, state.loginType]);
 
@@ -502,7 +502,7 @@ export const Login = memo(() => {
               isPending={state.isLoading}
               className="max-w-xs text-inherit"
             >
-              {state.isLoading ? "Please Wait…" : state.step === 1 ? "Next" : "Login"}
+              {state.isLoading ? "Please Wait…" : (state.step === 1 ? "Next" : "Login")}
             </Button>
           )}
           {state.step !== 3 && (

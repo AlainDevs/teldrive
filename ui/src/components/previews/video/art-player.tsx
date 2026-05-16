@@ -17,8 +17,8 @@ export const Player = forwardRef<Artplayer, PlayerProps>(
         container: artRef.current!,
       });
       art.aspectRatio = "16:9";
-      if (ref && typeof ref !== "function") ref.current = art;
-      else if (ref && typeof ref === "function") ref(art);
+      if (ref && typeof ref !== "function") {ref.current = art;}
+      else if (ref && typeof ref === "function") {ref(art);}
 
       return () => {
         if (art?.destroy) {

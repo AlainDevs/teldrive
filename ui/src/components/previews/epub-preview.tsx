@@ -27,7 +27,7 @@ const EpubPreview = ({ assetUrl }: { assetUrl: string }) => {
       location={location as string}
       locationChanged={onLocationChange}
       epubInitOptions={{ openAs: "epub" }}
-      epubOptions={{ flow: "scrolled", allowPopups: true }}
+      epubOptions={{ allowPopups: true, flow: "scrolled" }}
     />
   );
 };

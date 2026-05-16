@@ -4,23 +4,21 @@ import { createFileRoute } from "@tanstack/react-router";
 import { fileQueries } from "@/utils/query-options";
 import { ErrorView } from "@/components/error-view";
 
-const allowedTypes = ["my-drive", "recent", "search", "storage", "browse", "shared"];
+const allowedTypes = new Set(["my-drive", "recent", "search", "storage", "browse", "shared"]);
 
 export const Route = createFileRoute("/_authed/$view")({
   beforeLoad: ({ params }) => {
-    if (!allowedTypes.includes(params.view)) {
+    if (!allowedTypes.has(params.view)) {
       throw new Error("invalid path");
     }
   },
-  validateSearch: (search: Record<string, unknown>) => (search || {}) as FileListParams["params"],
-  loaderDeps: ({ search }) => search,
+  errorComponent: ({ error }) => <ErrorView message={error.message} />,
   loader: async ({ context: { queryClient }, deps, params }) => {
     await queryClient.ensureInfiniteQueryData(
-      fileQueries.list({ view: params.view as BrowseView, params: deps }),
+      fileQueries.list({ params: deps, view: params.view as BrowseView }),
     );
   },
+  loaderDeps: ({ search }) => search,
+  validateSearch: (search: Record<string, unknown>) => (search || {}) as FileListParams["params"],
   wrapInSuspense: true,
-  errorComponent: ({ error }) => {
-    return <ErrorView message={error.message} />;
-  },
 });

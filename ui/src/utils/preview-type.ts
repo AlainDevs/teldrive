@@ -1,15 +1,15 @@
 import { getExtension } from "@/utils/common";
 
 export const preview = {
-  markdown: "markdown",
-  image: "image",
-  text: "text",
-  pdf: "pdf",
-  code: "code",
-  video: "video",
   audio: "audio",
-  office: "office",
+  code: "code",
   epub: "epub",
+  image: "image",
+  markdown: "markdown",
+  office: "office",
+  pdf: "pdf",
+  text: "text",
+  video: "video",
 };
 
 export const extensions = {
@@ -42,7 +42,7 @@ export const extensions = {
   py: preview.code,
   css: preview.code,
   html: preview.code,
-  // typescript or video file, determined below
+  // Typescript or video file, determined below
   ts: preview.code,
   tsx: preview.code,
   rs: preview.code,

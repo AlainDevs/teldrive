@@ -2,7 +2,7 @@ import type { Tags } from "@/types";
 
 import { decode, getBuffer, getBytes, unpackBytes } from "./helpers";
 
-const sampleRatesTable = [[11025, 12000, 8000], null, [22050, 24000, 16000], [44100, 48000, 32000]];
+const sampleRatesTable = [[11_025, 12_000, 8000], null, [22_050, 24_000, 16_000], [44_100, 48_000, 32_000]];
 const samplesPerFrameTable = [[384, 1152, 576], null, [384, 1152, 576], [384, 1152, 1152]];
 
 // Bitrates
@@ -64,7 +64,7 @@ function decodeFrame(buffer: ArrayBuffer, offset: number, size: number) {
     return decode(stringBytes, "utf-16le");
   }
   if (firstByte === 3) {
-    const string = decode(bytes, "utf-8");
+    const string = decode(bytes, "utf8");
 
     return bytes[bytes.length - 1] === 0 ? string.slice(1, -1) : string.slice(1);
   }
@@ -203,7 +203,7 @@ async function parseID3Tag(
 function getAudioFrameSize(byte: number, { bitrate, sampleRate }: Tags) {
   const padding = (byte & 0x02) > 0 ? 1 : 0;
 
-  return Math.floor((144000 * (bitrate as number)) / (sampleRate as number)) + padding;
+  return Math.floor((144_000 * (bitrate as number)) / (sampleRate as number)) + padding;
 }
 
 // https://www.codeproject.com/Articles/8295/MPEG-Audio-Frame-Header#MPEGAudioFrameHeader
@@ -211,7 +211,7 @@ function parseAudioFrameHeader(bytes: Uint8Array, data: Tags) {
   const versionIndex = (bytes[1] >> 3) & 0x03;
   const layerIndex = (bytes[1] >> 1) & 0x03;
   const sampleRateIndex = (bytes[2] >> 2) & 0x03;
-  const bitrateIndex = (bytes[2] >> 4) & 0x0f;
+  const bitrateIndex = (bytes[2] >> 4) & 0x0F;
 
   data.sampleRate = sampleRatesTable[versionIndex]![sampleRateIndex];
   data.samplesPerFrame = samplesPerFrameTable[versionIndex]![layerIndex];
@@ -235,10 +235,10 @@ function parseXingHeader(buffer: ArrayBuffer, offset: number, tags: Tags) {
 
 function mapFrameIdToField(id: string) {
   const map = {
+    APIC: "picture",
+    TALB: "album",
     TIT2: "title",
     TPE1: "artist",
-    TALB: "album",
-    APIC: "picture",
   };
   return map[id as keyof typeof map];
 }

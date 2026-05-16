@@ -10,12 +10,12 @@ export const TopLoader = memo(() => {
   const [status, pathname] = useRouterState({ select: (s) => [s.status, s.location.pathname] });
 
   const loadingQueriesCount = useIsFetching({
-    predicate: (query) => !query.state.dataUpdatedAt,
     fetchStatus: "fetching",
+    predicate: (query) => !query.state.dataUpdatedAt,
   });
 
   useEffect(() => {
-    if (pathname?.startsWith("/search") || pathname?.startsWith("/settings")) return;
+    if (pathname?.startsWith("/search") || pathname?.startsWith("/settings")) {return;}
 
     if (status === "pending" && loadingQueriesCount > 0 && completed.current) {
       ref?.current?.continuousStart();

@@ -7,11 +7,7 @@ import { $api } from "@/utils/api";
 const shareUnlockStorageKey = (id: string) => `share-unlocked:${id}`;
 
 export const Route = createFileRoute("/_share/share/$id")({
-  validateSearch: (search: Record<string, unknown>) =>
-    search as {
-      path?: string;
-    },
-  loaderDeps: ({ search }) => search,
+  errorComponent: ({ error }) => <ErrorView message={error.message} />,
   loader: async ({ context: { queryClient }, params: { id }, deps }) => {
     const res = await queryClient.ensureQueryData(
       $api.queryOptions("get", "/shares/{id}", {
@@ -37,8 +33,10 @@ export const Route = createFileRoute("/_share/share/$id")({
       sessionStorage.removeItem(shareUnlockStorageKey(id));
     }
   },
+  loaderDeps: ({ search }) => search,
+  validateSearch: (search: Record<string, unknown>) =>
+    search as {
+      path?: string;
+    },
   wrapInSuspense: true,
-  errorComponent: ({ error }) => {
-    return <ErrorView message={error.message} />;
-  },
 });

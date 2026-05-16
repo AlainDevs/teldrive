@@ -51,8 +51,8 @@ x='50' y='50'%3E%3Cpath fill='white' fill-rule='evenodd' d='M12 2.25a.75.75 0 0 
 
 const DEFAULT_METADATA: AudioMetadata = {
   artist: "Unknown artist",
-  title: "Unknown title",
   cover: DEFAULT_COVER_SVG,
+  title: "Unknown title",
 };
 
 class AudioManager {
@@ -107,30 +107,14 @@ export const useAudioStore = create<PlayerState>((set, get) => {
   const updateMediaSession = (metadata: AudioMetadata) => {
     if ("mediaSession" in navigator && metadata.cover) {
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: metadata.title,
         artist: metadata.artist,
         artwork: [{ src: metadata.cover, type: "image/jpeg" }],
+        title: metadata.title,
       });
     }
   };
 
   return {
-    audio: null,
-    isPlaying: false,
-    duration: 0,
-    isLooping: false,
-    isMuted: false,
-    volume: 1,
-    isEnded: false,
-    currentTime: 0,
-    metadata: DEFAULT_METADATA,
-    metadataController: null,
-    error: "",
-    handlers: {
-      nextItem: () => {},
-      prevItem: () => {},
-    },
-
     actions: {
       loadAudio: async (url: string, name: string) => {
         const state = get();
@@ -159,7 +143,7 @@ export const useAudioStore = create<PlayerState>((set, get) => {
 
           audioManager.attachEventListener("ended", () => {
             get().handlers.nextItem("audio");
-            set({ isEnded: true, currentTime: 0 });
+            set({ currentTime: 0, isEnded: true });
           });
 
           const tags = await parseAudioMetadata(url, controller.signal);
@@ -168,8 +152,8 @@ export const useAudioStore = create<PlayerState>((set, get) => {
           const cover = picture ? URL.createObjectURL(picture) : "";
           const metadata = {
             artist: artist || DEFAULT_METADATA.artist,
-            title: title || name,
             cover,
+            title: title || name,
           };
 
           audio.src = url;
@@ -183,11 +167,11 @@ export const useAudioStore = create<PlayerState>((set, get) => {
 
           set({
             audio,
-            isPlaying: true,
-            isEnded: false,
-            metadata,
             currentTime: 0,
             error: "",
+            isEnded: false,
+            isPlaying: true,
+            metadata,
           });
         } catch (error) {
           if ((error as Error).name !== "AbortError") {
@@ -196,25 +180,6 @@ export const useAudioStore = create<PlayerState>((set, get) => {
         }
       },
 
-      seek: (value: number) => {
-        const audio = audioManager.getAudio();
-        if (audio) {
-          audio.currentTime = value;
-          set({ currentTime: value });
-        }
-      },
-
-      setVolume: (value: number) => {
-        const audio = audioManager.getAudio();
-        if (audio) {
-          const normalizedVolume = Math.max(0, Math.min(1, value));
-          audio.volume = normalizedVolume;
-          set({ volume: normalizedVolume });
-        }
-      },
-
-      setCurrentTime: (value: number) => set({ currentTime: value }),
-
       repeat: () => {
         const audio = audioManager.getAudio();
         if (audio) {
@@ -222,31 +187,6 @@ export const useAudioStore = create<PlayerState>((set, get) => {
           set({ currentTime: 0 });
         }
       },
-
-      togglePlay: () => {
-        const audio = audioManager.getAudio();
-        if (audio) {
-          get().isPlaying ? audio.pause() : audio.play();
-        }
-      },
-
-      toggleMute: () => {
-        const audio = audioManager.getAudio();
-        if (audio) {
-          audio.muted = !audio.muted;
-          set({ isMuted: audio.muted });
-        }
-      },
-
-      toggleLooping: () => {
-        const audio = audioManager.getAudio();
-        if (audio) {
-          audio.loop = !audio.loop;
-          set({ isLooping: audio.loop });
-        }
-      },
-
-      set: (payload: Partial<PlayerState>) => set(payload),
 
       reset: () => {
         const state = get();
@@ -258,21 +198,80 @@ export const useAudioStore = create<PlayerState>((set, get) => {
 
         set({
           audio: null,
-          isPlaying: false,
+          currentTime: 0,
           duration: 0,
+          error: "",
+          isEnded: false,
           isLooping: false,
           isMuted: false,
-          volume: 1,
-          isEnded: false,
-          currentTime: 0,
+          isPlaying: false,
           metadata: DEFAULT_METADATA,
           metadataController: null,
-          error: "",
+          volume: 1,
         });
       },
 
+      seek: (value: number) => {
+        const audio = audioManager.getAudio();
+        if (audio) {
+          audio.currentTime = value;
+          set({ currentTime: value });
+        }
+      },
+
+      set: (payload: Partial<PlayerState>) => set(payload),
+
+      setCurrentTime: (value: number) => set({ currentTime: value }),
+
       setHandlers: (handlers: AudioHandlers) => set({ handlers }),
+
+      setVolume: (value: number) => {
+        const audio = audioManager.getAudio();
+        if (audio) {
+          const normalizedVolume = Math.max(0, Math.min(1, value));
+          audio.volume = normalizedVolume;
+          set({ volume: normalizedVolume });
+        }
+      },
+
+      toggleLooping: () => {
+        const audio = audioManager.getAudio();
+        if (audio) {
+          audio.loop = !audio.loop;
+          set({ isLooping: audio.loop });
+        }
+      },
+
+      toggleMute: () => {
+        const audio = audioManager.getAudio();
+        if (audio) {
+          audio.muted = !audio.muted;
+          set({ isMuted: audio.muted });
+        }
+      },
+
+      togglePlay: () => {
+        const audio = audioManager.getAudio();
+        if (audio) {
+          get().isPlaying ? audio.pause() : audio.play();
+        }
+      },
     },
+    audio: null,
+    currentTime: 0,
+    duration: 0,
+    error: "",
+    handlers: {
+      nextItem: () => {},
+      prevItem: () => {},
+    },
+    isEnded: false,
+    isLooping: false,
+    isMuted: false,
+    isPlaying: false,
+    metadata: DEFAULT_METADATA,
+    metadataController: null,
+    volume: 1,
   };
 });
 

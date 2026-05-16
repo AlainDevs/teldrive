@@ -19,13 +19,13 @@ import IcOutlineStorage from "~icons/ic/outline-storage";
 import IcOutlineVideocam from "~icons/ic/outline-videocam";
 
 const categoryIcons: Record<string, React.ElementType> = {
-  video: IcOutlineVideocam,
+  archive: IcOutlineArchive,
   audio: IcOutlineAudiotrack,
-  image: IcOutlineImage,
   document: IcOutlineDescription,
   folder: IcOutlineFolder,
-  archive: IcOutlineArchive,
+  image: IcOutlineImage,
   other: IcOutlineInsertDriveFile,
+  video: IcOutlineVideocam,
 };
 
 function getTotalStats(data: CategoryStorage[]) {
@@ -35,7 +35,7 @@ function getTotalStats(data: CategoryStorage[]) {
       acc.totalFiles += item.totalFiles;
       return acc;
     },
-    { totalSize: 0, totalFiles: 0 },
+    { totalFiles: 0, totalSize: 0 },
   );
 }
 

@@ -1,4 +1,4 @@
-import { Toaster as HotToaster, toast, resolveValue } from "react-hot-toast";
+import { Toaster as HotToaster, resolveValue, toast } from "react-hot-toast";
 import IconMaterialSymbolsClose from "~icons/material-symbols/close";
 import IconMaterialSymbolsCheckCircleRounded from "~icons/material-symbols/check-circle-rounded";
 import IconMaterialSymbolsErrorRounded from "~icons/material-symbols/error-rounded";

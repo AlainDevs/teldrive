@@ -1,4 +1,4 @@
-import { lazy, memo, Suspense, useCallback, useState } from "react";
+import { Suspense, lazy, memo, useCallback, useState } from "react";
 import type { BrowseView, Session } from "@/types";
 import { Modal } from "@heroui/react";
 import { FbIcon, type FileData, useIconData } from "file-browser";
@@ -90,8 +90,7 @@ interface ControlButtonProps {
   onPress: () => void;
 }
 
-const ControlButton = ({ type, onPress }: ControlButtonProps) => {
-  return (
+const ControlButton = ({ type, onPress }: ControlButtonProps) => (
     <Button
       className="size-8 min-w-8 px-0"
       variant="ghost"
@@ -103,9 +102,8 @@ const ControlButton = ({ type, onPress }: ControlButtonProps) => {
       {type === "next" ? <IconIcRoundNavigateNext /> : <IconIcRoundNavigateBefore />}
     </Button>
   );
-};
 
-export default memo(function PreviewModal({
+export default memo(({
   files: fileProp,
   session,
   shareId,
@@ -117,7 +115,7 @@ export default memo(function PreviewModal({
   session?: Session;
   shareId?: string;
   view: BrowseView;
-}) {
+}) => {
   const [files] = useState(
     fileProp.toSorted((a, b) =>
       defaultSortState.order === "asc"
@@ -136,7 +134,7 @@ export default memo(function PreviewModal({
 
   const { id, name, previewType } = currentFile;
 
-  const { icon } = useIconData({ id, name, isDir: false });
+  const { icon } = useIconData({ id, isDir: false, name });
 
   const nextItem = useCallback(
     (previewType = "all") => {
@@ -262,7 +260,7 @@ export default memo(function PreviewModal({
   return (
     <Modal.Backdrop
       isOpen={open}
-      onOpenChange={(o) => { if (!o) handleClose(); }}
+      onOpenChange={(o) => { if (!o) {handleClose();} }}
     >
       <Modal.Container>
         <Modal.Dialog aria-labelledby="preview-modal">

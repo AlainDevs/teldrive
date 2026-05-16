@@ -11,8 +11,8 @@ type PeriodicJobSummary = components["schemas"]["PeriodicJobSummary"];
 
 const kindLabel: Record<PeriodicJobSummary["kind"], string> = {
   "clean.old_events": "Clean Old Events",
-  "clean.stale_uploads": "Clean Stale Uploads",
   "clean.pending_files": "Clean Pending Files",
+  "clean.stale_uploads": "Clean Stale Uploads",
   "refresh.folder_sizes": "Refresh Folder Sizes",
 };
 
@@ -34,11 +34,11 @@ export const JobsTab = memo(() => {
     mutation.mutate(
       { params: { path: { id: job.id } } },
       {
+        onError: () => toast.error("Failed to update job"),
         onSuccess: () => {
           toast.success(job.enabled ? "Job disabled" : "Job enabled");
           refreshJobs();
         },
-        onError: () => toast.error("Failed to update job"),
       },
     );
   };
@@ -47,11 +47,11 @@ export const JobsTab = memo(() => {
     runMutation.mutate(
       { params: { path: { id: job.id } } },
       {
+        onError: () => toast.error("Failed to schedule job"),
         onSuccess: () => {
           toast.success("Job scheduled");
           refreshJobs();
         },
-        onError: () => toast.error("Failed to schedule job"),
       },
     );
   };

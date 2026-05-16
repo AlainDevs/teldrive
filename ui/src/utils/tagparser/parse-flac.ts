@@ -10,8 +10,8 @@ function bytesToNum(bytes: Uint8Array) {
 // https://xiph.org/flac/format.html#metadata_block_streaminfo
 function parseStreamInfoBlock(bytes: Uint8Array, tags: Tags) {
   const sampleRate = bytesToNum(bytes.slice(10, 13)) >> 4;
-  // const sampleBytes = [bytes[13] & 0x0F, ...bytes.slice(14, 18)];
-  const sampleBytes = new Uint8Array([bytes[13] & 0x0f, ...bytes.slice(14, 18)]);
+  // Const sampleBytes = [bytes[13] & 0x0F, ...bytes.slice(14, 18)];
+  const sampleBytes = new Uint8Array([bytes[13] & 0x0F, ...bytes.slice(14, 18)]);
   const totalSamples = bytesToNum(sampleBytes);
 
   if (sampleRate) {
@@ -28,7 +28,7 @@ async function parseBlocks(file: string, buffer: ArrayBuffer, offset = 4) {
     const header = getBytes(buffer, offset, 4);
     const length = unpackBytes(header, { endian: "big" });
     const firstByte = header[0];
-    const blockType = firstByte & 0x7f;
+    const blockType = firstByte & 0x7F;
 
     isLastBlock = (firstByte & 0x80) === 0x80;
     offset += 4;

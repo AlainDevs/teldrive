@@ -17,6 +17,10 @@ export interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     immer((set) => ({
+      resetSettings: () =>
+        set((state) => {
+          state.settings = { ...settings };
+        }),
       settings,
       updateSetting: <K extends keyof Settings>(key: K, value: Settings[K]) =>
         set((state) => {
@@ -26,13 +30,8 @@ export const useSettingsStore = create<SettingsState>()(
         set((state) => {
           Object.assign(state.settings, newSettings);
         }),
-      resetSettings: () =>
-        set((state) => {
-          state.settings = { ...settings };
-        }),
     })),
     {
-      name: "teldrive-settings",
       merge: (persistedState: any, currentState) => {
         const defaultSettings = getSettingsValues();
         const mergedSettings = { ...defaultSettings };
@@ -51,6 +50,7 @@ export const useSettingsStore = create<SettingsState>()(
           settings: mergedSettings,
         };
       },
+      name: "teldrive-settings",
     },
   ),
 );

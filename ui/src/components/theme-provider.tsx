@@ -3,23 +3,23 @@ import { useLocalStorage } from "usehooks-ts";
 
 type Theme = "dark" | "light" | "system";
 
-type ColorScheme = {
+interface ColorScheme {
   color: string;
   cssVars?: Record<string, string>;
-};
+}
 
-type ThemeProviderProps = {
+interface ThemeProviderProps {
   children: React.ReactNode;
   defaultTheme?: Theme;
   storageKey?: string;
-};
+}
 
-type ThemeProviderState = {
+interface ThemeProviderState {
   colorScheme: ColorScheme;
   theme: Theme;
   setTheme: (theme: Theme) => void;
   setColorScheme: (colorScheme: ColorScheme) => void;
-};
+}
 
 export const defaultColorScheme: ColorScheme = {
   color: "#82b1ff",
@@ -27,9 +27,9 @@ export const defaultColorScheme: ColorScheme = {
 
 const initialState: ThemeProviderState = {
   colorScheme: defaultColorScheme,
-  theme: "system",
-  setTheme: () => null,
   setColorScheme: () => null,
+  setTheme: () => null,
+  theme: "system",
 };
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
@@ -64,10 +64,10 @@ export function ThemeProvider({
 
   const value = useMemo(
     () => ({
-      theme,
-      setTheme,
       colorScheme,
       setColorScheme,
+      setTheme,
+      theme,
     }),
     [theme, setTheme, colorScheme, setColorScheme],
   );

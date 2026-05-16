@@ -24,18 +24,18 @@ const UploadFileEntry = memo(function UploadFileEntry({
   const fileMap = useFileUploadStore((state) => state.fileMap);
   const { name } = file;
 
-  const iconConfig = useMemo(() => ({ name, isDir: isFolder, id: "" }), [name, isFolder]);
+  const iconConfig = useMemo(() => ({ id: "", isDir: isFolder, name }), [name, isFolder]);
   const { icon, colorCode } = useIconData(iconConfig);
 
   const childFiles = useMemo(() => {
-    if (!isFolder) return [];
+    if (!isFolder) {return [];}
     return fileIds
       .filter((childId) => fileMap[childId]?.parentFolderId === id)
-      .sort((a, b) => fileMap[a].file.name.localeCompare(fileMap[b].file.name));
+      .toSorted((a, b) => fileMap[a].file.name.localeCompare(fileMap[b].file.name));
   }, [isFolder, fileIds, fileMap, id]);
 
   const folderProgress = useMemo(() => {
-    if (!isFolder || childFiles.length === 0) return 0;
+    if (!isFolder || childFiles.length === 0) {return 0;}
     const totalProgress = childFiles.reduce(
       (sum, childId) => sum + (fileMap[childId]?.progress || 0),
       0,
@@ -44,12 +44,12 @@ const UploadFileEntry = memo(function UploadFileEntry({
   }, [isFolder, childFiles, fileMap]);
 
   const folderStatus = useMemo(() => {
-    if (!isFolder) return status;
+    if (!isFolder) {return status;}
     const statuses = childFiles.map((childId) => fileMap[childId]?.status);
-    if (statuses.some((s) => s === FileUploadStatus.CANCELLED)) return FileUploadStatus.CANCELLED;
-    if (statuses.some((s) => s === FileUploadStatus.FAILED)) return FileUploadStatus.FAILED;
-    if (statuses.every((s) => s === FileUploadStatus.UPLOADED)) return FileUploadStatus.UPLOADED;
-    if (statuses.some((s) => s === FileUploadStatus.UPLOADING)) return FileUploadStatus.UPLOADING;
+    if (statuses.some((s) => s === FileUploadStatus.CANCELLED)) {return FileUploadStatus.CANCELLED;}
+    if (statuses.some((s) => s === FileUploadStatus.FAILED)) {return FileUploadStatus.FAILED;}
+    if (statuses.every((s) => s === FileUploadStatus.UPLOADED)) {return FileUploadStatus.UPLOADED;}
+    if (statuses.some((s) => s === FileUploadStatus.UPLOADING)) {return FileUploadStatus.UPLOADING;}
     return FileUploadStatus.NOT_STARTED;
   }, [isFolder, childFiles, fileMap, status]);
 

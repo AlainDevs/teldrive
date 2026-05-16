@@ -10,7 +10,7 @@ import MdiCancel from "~icons/mdi/cancel";
 import { FileUploadStatus } from "@/utils/stores";
 import type { CircularProgressProps } from "./types";
 
-export const CircularProgress = memo(function CircularProgress({
+export const CircularProgress = memo(({
   progress,
   size = 24,
   strokeWidth = 3,
@@ -18,7 +18,7 @@ export const CircularProgress = memo(function CircularProgress({
   showCancel = false,
   onCancel,
   status = FileUploadStatus.NOT_STARTED,
-}: CircularProgressProps) {
+}: CircularProgressProps) => {
   const showStatusIcon =
     status === FileUploadStatus.CANCELLED ||
     status === FileUploadStatus.FAILED ||
@@ -35,7 +35,7 @@ export const CircularProgress = memo(function CircularProgress({
           status === FileUploadStatus.FAILED && "text-danger",
           status === FileUploadStatus.UPLOADED && "text-accent",
         )}
-        style={{ width: size, height: size }}
+        style={{ height: size, width: size }}
       >
         {status === FileUploadStatus.CANCELLED && <MdiCancel className="size-5" />}
         {status === FileUploadStatus.FAILED && <IcRoundErrorOutline className="size-5" />}
@@ -80,7 +80,7 @@ export const CircularProgress = memo(function CircularProgress({
           fill="none"
           strokeDasharray={strokeDasharray}
           strokeDashoffset={strokeDashoffset}
-          className={"text-accent transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)]"}
+          className="text-accent transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)]"
           strokeLinecap="round"
         />
       </svg>

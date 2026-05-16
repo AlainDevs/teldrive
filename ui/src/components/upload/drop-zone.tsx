@@ -1,6 +1,6 @@
 import { useFileUploadStore } from "@/utils/stores";
 import { AnimatePresence, motion } from "framer-motion";
-import { useCallback, useState, memo } from "react";
+import { memo, useCallback, useState } from "react";
 import clsx from "clsx";
 import IconParkOutlineUpload from "~icons/icon-park-outline/upload";
 
@@ -32,7 +32,7 @@ export const UploadDropzone = memo(
       e.preventDefault();
       e.stopPropagation();
       // Only set to false if we're leaving the dropzone itself, not entering a child
-      if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+      if (e.currentTarget.contains(e.relatedTarget as Node)) {return;}
       setIsDragging(false);
     }, []);
 
@@ -42,7 +42,7 @@ export const UploadDropzone = memo(
         e.stopPropagation();
         setIsDragging(false);
 
-        if (isDisabled) return;
+        if (isDisabled) {return;}
 
         const nativeEvent = e.nativeEvent as DragEvent;
         const nativeItems = nativeEvent?.dataTransfer?.items;
@@ -52,13 +52,13 @@ export const UploadDropzone = memo(
         } else {
           // Fallback for browsers that don't support DataTransferItem or entries
           const rootFiles: File[] = [];
-          // items is a DataTransferItemList, we need to iterate it
+          // Items is a DataTransferItemList, we need to iterate it
           if (e.dataTransfer.items) {
             for (let i = 0; i < e.dataTransfer.items.length; i++) {
               const item = e.dataTransfer.items[i];
               if (item.kind === "file") {
                 const file = item.getAsFile();
-                if (file) rootFiles.push(file);
+                if (file) {rootFiles.push(file);}
               }
             }
           } else if (e.dataTransfer.files) {
@@ -96,9 +96,9 @@ export const UploadDropzone = memo(
               )}
             >
               <motion.div
-                initial={{ scale: 0.9, opacity: 0, y: 10 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.9, opacity: 0, y: 10 }}
+                initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 10 }}
                 className={clsx(
                   "bg-surface-secondary border-2 border-dashed border-accent/50",
                   "rounded-[32px] p-12 flex flex-col items-center gap-4 shadow-2xl",

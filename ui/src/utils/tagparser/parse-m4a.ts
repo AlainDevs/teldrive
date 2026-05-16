@@ -4,8 +4,8 @@ import { decode, getBytes, unpackBytes } from "./helpers";
 
 function getAtomSize(buffer: ArrayBuffer, offset: number) {
   return unpackBytes(getBytes(buffer, offset, 4), {
-    endian: "big",
     byteCount: 4,
+    endian: "big",
   });
 }
 
@@ -51,13 +51,13 @@ function parseMetadataItemListAtom(
   tags: Tags,
 ) {
   const atomTypeToField = {
+    covr: "picture",
     "\xA9ART": "artist",
-    "\xA9nam": "title",
     "\xA9alb": "album",
     "\xA9cmt": "comment",
     "\xA9day": "year",
+    "\xA9nam": "title",
     "\xA9too": "encoding",
-    covr: "picture",
   };
 
   while (atomSize) {
@@ -75,7 +75,7 @@ function parseMetadataItemListAtom(
       if (field === "picture") {
         tags[field] = new Blob([dataBytes], { type: getMIMEType(dataBytes) });
       } else {
-        tags[field] = decode(dataBytes, "utf-8");
+        tags[field] = decode(dataBytes, "utf8");
       }
     }
     offset += size;

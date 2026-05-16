@@ -6,8 +6,7 @@ interface FilterChipProps {
   value: string;
 }
 
-export const FilterChip = ({ startIcon, children, value }: FilterChipProps) => {
-  return (
+export const FilterChip = ({ startIcon, children, value }: FilterChipProps) => (
     <Checkbox value={value} className="rounded-full border px-3 py-1.5">
       <span className="inline-flex items-center gap-2 capitalize">
         {startIcon}
@@ -15,4 +14,3 @@ export const FilterChip = ({ startIcon, children, value }: FilterChipProps) => {
       </span>
     </Checkbox>
   );
-};

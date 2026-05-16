@@ -13,13 +13,13 @@ import { $api } from "@/utils/api"
 import { copyDataToClipboard } from "@/utils/common"
 
 function formatDate(value?: string) {
-  if (!value) return "Never"
+  if (!value) {return "Never"}
   return new Date(value).toLocaleString(undefined, {
-    month: "short",
     day: "numeric",
-    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    month: "short",
+    year: "numeric",
   })
 }
 
@@ -47,13 +47,13 @@ function ApiKeysCardInner() {
   })
 
   const revokeMutation = $api.useMutation("delete", "/users/api-keys/{id}", {
+    onError: () => {
+      setRevokingID(null)
+    },
     onSuccess: () => {
       setRevokingID(null)
       queryClient.invalidateQueries({ queryKey: listOptions.queryKey })
       toast.success("API key revoked")
-    },
-    onError: () => {
-      setRevokingID(null)
     },
   })
 
@@ -137,7 +137,7 @@ function ApiKeysCardInner() {
         <div className="flex items-center justify-center py-8">
           <Spinner />
         </div>
-      ) : data && data.length > 0 ? (
+      ) : (data && data.length > 0 ? (
         <div className="space-y-3">
           {data.map((key) => (
             <div
@@ -178,7 +178,7 @@ function ApiKeysCardInner() {
         <div className="rounded-2xl border-2 border-dashed border-border/30 bg-surface/50 p-6 text-sm text-muted text-center">
           No API keys yet.
         </div>
-      )}
+      ))}
     </div>
   )
 }

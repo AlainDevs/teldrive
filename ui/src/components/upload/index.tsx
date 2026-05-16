@@ -30,12 +30,12 @@ export const Upload = ({ queryKey }: UploadProps) => {
     fileMap,
   } = useFileUploadStore(
     useShallow((state) => ({
+      actions: state.actions,
+      collapse: state.collapse,
+      currentFile: state.fileMap[state.currentFileId],
+      fileDialogOpen: state.fileDialogOpen,
       fileIds: state.filesIds,
       fileMap: state.fileMap,
-      currentFile: state.fileMap[state.currentFileId],
-      collapse: state.collapse,
-      actions: state.actions,
-      fileDialogOpen: state.fileDialogOpen,
       folderDialogOpen: state.folderDialogOpen,
     })),
   );
@@ -45,7 +45,7 @@ export const Upload = ({ queryKey }: UploadProps) => {
   const uploadSummary = useMemo(() => {
     const topLevelIds = fileIds.filter((id) => {
       const file = fileMap[id];
-      if (!file) return false;
+      if (!file) {return false;}
       const isChildFile =
         file.parentFolderId && fileIds.includes(file.parentFolderId);
       return !isChildFile;
@@ -92,23 +92,21 @@ export const Upload = ({ queryKey }: UploadProps) => {
     const totalProgress = totalSize > 0 ? (uploadedSize / totalSize) * 100 : 0;
 
     return {
-      folders,
       files,
+      folders,
       totalProgress,
       totalSize,
       uploadedSize,
     };
   }, [fileIds, fileMap]);
 
-  const topLevelFileIds = useMemo(() => {
-    return fileIds.filter((id) => {
+  const topLevelFileIds = useMemo(() => fileIds.filter((id) => {
       const file = fileMap[id];
-      if (!file) return false;
+      if (!file) {return false;}
       const isChildFile =
         file.parentFolderId && fileIds.includes(file.parentFolderId);
       return !isChildFile;
-    });
-  }, [fileIds, fileMap]);
+    }), [fileIds, fileMap]);
 
   const { settings } = useSettingsStore();
 
@@ -207,10 +205,10 @@ export const Upload = ({ queryKey }: UploadProps) => {
           .mutateAsync({
             body: {
               name: currentFile.file.name,
-              type: "folder",
               path: currentFile.relativePath
                 ? `${path || "/"}/${currentFile.relativePath.split("/").slice(0, -1).join("/")}`
                 : path || "/",
+              type: "folder",
             },
           })
           .then(() => {
@@ -220,17 +218,17 @@ export const Upload = ({ queryKey }: UploadProps) => {
             );
             actions.startNextUpload();
           })
-          .catch((err) => {
+          .catch((error) => {
             if (
-              err.message.includes("already exists") ||
-              err.message.includes("exists")
+              error.message.includes("already exists") ||
+              error.message.includes("exists")
             ) {
               actions.setFileUploadStatus(
                 currentFile.id,
                 FileUploadStatus.SKIPPED,
               );
             } else {
-              actions.setError(currentFile.id, err.message);
+              actions.setError(currentFile.id, error.message);
               actions.setFileUploadStatus(
                 currentFile.id,
                 FileUploadStatus.FAILED,

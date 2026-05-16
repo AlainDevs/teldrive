@@ -69,10 +69,10 @@ const AudioInfo = memo(() => {
 const AudioDurationSlider = memo(() => {
   const { audio,duration, currentTime, actions, isPlaying } = useAudioStore(
     useShallow((state) => ({
-      audio: state.audio,
-      duration: state.duration,
-      currentTime: state.currentTime,
       actions: state.actions,
+      audio: state.audio,
+      currentTime: state.currentTime,
+      duration: state.duration,
       isPlaying: state.isPlaying,
     }))
   );
@@ -165,9 +165,9 @@ const VolumeSlider = memo(() => {
 const TopControls = memo(() => {
   const { isPlaying, actions, handlers } = useAudioStore(
     useShallow((state) => ({
-      isPlaying: state.isPlaying,
       actions: state.actions,
       handlers: state.handlers,
+      isPlaying: state.isPlaying,
     }))
   );
 
@@ -209,9 +209,9 @@ const BottomControls = memo(() => {
   const actions = useAudioStore(audioActions);
   const { volume, muted, looping } = useAudioStore(
     useShallow((state) => ({
-      volume: state.volume,
-      muted: state.isMuted,
       looping: state.isLooping,
+      muted: state.isMuted,
+      volume: state.volume,
     }))
   );
 
@@ -238,8 +238,7 @@ const BottomControls = memo(() => {
   );
 });
 
-export const AudioPlayer = memo(() => {
-  return (
+export const AudioPlayer = memo(() => (
     <div
       className="flex flex-col relative overflow-hidden height-auto outline-none 
       bg-surface max-w-80 md:max-w-[39rem] rounded-xl p-3 m-auto"
@@ -256,5 +255,4 @@ export const AudioPlayer = memo(() => {
         </div>
       </div>
     </div>
-  );
-});
+  ));

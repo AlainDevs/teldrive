@@ -65,26 +65,19 @@ export interface UploadState {
 
 export const useFileUploadStore = create<UploadState>()(
   immer((set, get) => ({
-    filesIds: [],
-    fileMap: {},
-    currentFileId: "",
-    collapse: false,
-    fileDialogOpen: false,
-    folderDialogOpen: false,
-    uploadOpen: false,
     actions: {
       addFiles: (files: File[]) =>
         set((state) => {
           const newFiles = files.map((file) => ({
-            id: Math.random().toString(36).slice(2, 9),
+            collapsed: false,
+            controller: new AbortController(),
             file,
+            id: Math.random().toString(36).slice(2, 9),
+            isFolder: false,
+            progress: 0,
+            speed: 0,
             status: FileUploadStatus.NOT_STARTED,
             totalChunks: 0,
-            controller: new AbortController(),
-            progress: 0,
-            isFolder: false,
-            speed: 0,
-            collapsed: false,
           }));
 
           const ids = newFiles.map((file) => {
@@ -112,16 +105,16 @@ export const useFileUploadStore = create<UploadState>()(
           const rootFolderFile = new File([], folderName, { type: "folder" });
 
           state.fileMap[rootFolderId] = {
-            id: rootFolderId,
+            collapsed: false,
+            controller: new AbortController(),
             file: rootFolderFile,
+            id: rootFolderId,
+            isFolder: true,
+            progress: 0,
+            relativePath: folderName,
+            speed: 0,
             status: FileUploadStatus.NOT_STARTED,
             totalChunks: 0,
-            controller: new AbortController(),
-            progress: 0,
-            isFolder: true,
-            speed: 0,
-            collapsed: false,
-            relativePath: folderName,
           };
 
           state.filesIds.push(rootFolderId);
@@ -143,17 +136,17 @@ export const useFileUploadStore = create<UploadState>()(
                 const folderFile = new File([], part, { type: "folder" });
 
                 state.fileMap[folderId] = {
-                  id: folderId,
-                  file: folderFile,
-                  status: FileUploadStatus.NOT_STARTED,
-                  totalChunks: 0,
+                  collapsed: false,
                   controller: new AbortController(),
-                  progress: 0,
+                  file: folderFile,
+                  id: folderId,
                   isFolder: true,
                   parentFolderId: parentId,
-                  speed: 0,
-                  collapsed: false,
+                  progress: 0,
                   relativePath: currentPath,
+                  speed: 0,
+                  status: FileUploadStatus.NOT_STARTED,
+                  totalChunks: 0,
                 };
                 state.filesIds.push(folderId);
                 folderPathMap.set(currentPath, folderId);
@@ -164,17 +157,17 @@ export const useFileUploadStore = create<UploadState>()(
             // Create file entry
             const fileId = Math.random().toString(36).slice(2, 9);
             state.fileMap[fileId] = {
-              id: fileId,
-              file: file,
-              status: FileUploadStatus.NOT_STARTED,
-              totalChunks: 0,
+              collapsed: false,
               controller: new AbortController(),
-              progress: 0,
+              file: file,
+              id: fileId,
               isFolder: false,
               parentFolderId: parentId,
+              progress: 0,
               relativePath: file.webkitRelativePath,
               speed: 0,
-              collapsed: false,
+              status: FileUploadStatus.NOT_STARTED,
+              totalChunks: 0,
             };
             state.filesIds.push(fileId);
           });
@@ -184,101 +177,21 @@ export const useFileUploadStore = create<UploadState>()(
           }
         }),
 
-      handleDragDrop: async (items: DataTransferItemList) => {
-        const rootFiles: File[] = [];
-        const folderOperations: Promise<void>[] = [];
-        const { addFiles, addFolder, setUploadOpen } = get().actions;
-
-        for (let i = 0; i < items.length; i++) {
-          const entry = items[i].webkitGetAsEntry();
-          if (!entry) continue;
-
-          if (entry.isDirectory) {
-            folderOperations.push(
-              (async () => {
-                try {
-                  const files = await scanEntries(entry);
-                  addFolder(files, entry.name);
-                } catch (err) {
-                  console.error("Folder processing failed:", err);
-                }
-              })(),
-            );
-          } else {
-            folderOperations.push(
-              (async () => {
-                try {
-                  const file = await new Promise<File>((resolve, reject) =>
-                    (entry as FileSystemFileEntry).file(resolve, reject),
-                  );
-                  rootFiles.push(file);
-                } catch (err) {
-                  console.error("File processing failed:", err);
-                }
-              })(),
-            );
+      cancelUpload: () =>
+        set((state) => {
+          const file = state.fileMap[state.currentFileId];
+          if (file?.controller) {
+            file.controller.abort();
           }
-        }
-
-        await Promise.all(folderOperations);
-
-        if (rootFiles.length > 0) {
-          // Check if any files are already being added (by checking fileMap/ids)
-          // or just rely on addFiles to handle it.
-          addFiles(rootFiles);
-        }
-
-        if (folderOperations.length > 0 || rootFiles.length > 0) {
-          setUploadOpen(true);
-        }
-      },
-
-      handleSelection: (files: FileList | null) => {
-        if (!files || files.length === 0) return;
-        const { addFolder, addFiles } = get().actions;
-
-        const fileList = Array.from(files);
-        const firstFile = fileList[0];
-        const relativePath = firstFile?.webkitRelativePath;
-        const hasFolderStructure = relativePath && fileList.length > 0;
-
-        if (hasFolderStructure) {
-          const pathParts = relativePath.split("/");
-          const folderName = pathParts[0] || "Untitled Folder";
-          addFolder(fileList, folderName);
-        } else {
-          const validFiles = fileList.filter((f) => f.size > 0);
-          if (validFiles.length > 0) {
-            addFiles(validFiles);
-          }
-        }
-      },
-
-      setProgress: (id: string, progress: number) =>
-        set((state) => {
-          if (!state.fileMap[id]) return;
-          state.fileMap[id].progress = progress;
+          state.fileMap = {};
+          state.filesIds = [];
+          state.currentFileId = "";
+          state.collapse = false;
+          state.uploadOpen = false;
+          state.fileDialogOpen = false;
+          state.folderDialogOpen = false;
         }),
-      setSpeed: (id: string, speed: number) =>
-        set((state) => {
-          if (!state.fileMap[id]) return;
-          state.fileMap[id].speed = speed;
-        }),
-      setETA: (id: string, eta: number) =>
-        set((state) => {
-          if (!state.fileMap[id]) return;
-          state.fileMap[id].eta = eta;
-        }),
-      setChunksCompleted: (id: string, chunks: number) =>
-        set((state) => {
-          if (!state.fileMap[id]) return;
-          state.fileMap[id].chunksCompleted = chunks;
-        }),
-      setError: (id: string, error: string) =>
-        set((state) => {
-          if (!state.fileMap[id]) return;
-          state.fileMap[id].error = error;
-        }),
+
       clearAll: () =>
         set((state) => {
           const completedIds = state.filesIds.filter(
@@ -298,31 +211,76 @@ export const useFileUploadStore = create<UploadState>()(
             state.uploadOpen = false;
           }
         }),
-      setFolderId: (id: string, folderId: string) =>
-        set((state) => {
-          if (!state.fileMap[id]) return;
-          state.fileMap[id].folderId = folderId;
-        }),
-      toggleFolderCollapsed: (id: string) =>
-        set((state) => {
-          if (state.fileMap[id]?.isFolder) {
-            state.fileMap[id].collapsed = !state.fileMap[id].collapsed;
-          }
-        }),
-      setFileUploadStatus: (id: string, status: FileUploadStatus) =>
-        set((state) => {
-          if (!state.fileMap[id]) return;
-          state.fileMap[id].status = status;
-        }),
-      setFolderDialogOpen: (open: boolean) =>
-        set((state) => {
-          state.folderDialogOpen = open;
-        }),
 
-      setCurrentFileId: (id: string) =>
-        set((state) => {
-          state.currentFileId = id;
-        }),
+      handleDragDrop: async (items: DataTransferItemList) => {
+        const rootFiles: File[] = [];
+        const folderOperations: Promise<void>[] = [];
+        const { addFiles, addFolder, setUploadOpen } = get().actions;
+
+        for (let i = 0; i < items.length; i++) {
+          const entry = items[i].webkitGetAsEntry();
+          if (!entry) {continue;}
+
+          if (entry.isDirectory) {
+            folderOperations.push(
+              (async () => {
+                try {
+                  const files = await scanEntries(entry);
+                  addFolder(files, entry.name);
+                } catch (error) {
+                  console.error("Folder processing failed:", error);
+                }
+              })(),
+            );
+          } else {
+            folderOperations.push(
+              (async () => {
+                try {
+                  const file = await new Promise<File>((resolve, reject) =>
+                    (entry as FileSystemFileEntry).file(resolve, reject),
+                  );
+                  rootFiles.push(file);
+                } catch (error) {
+                  console.error("File processing failed:", error);
+                }
+              })(),
+            );
+          }
+        }
+
+        await Promise.all(folderOperations);
+
+        if (rootFiles.length > 0) {
+          // Check if any files are already being added (by checking fileMap/ids)
+          // Or just rely on addFiles to handle it.
+          addFiles(rootFiles);
+        }
+
+        if (folderOperations.length > 0 || rootFiles.length > 0) {
+          setUploadOpen(true);
+        }
+      },
+
+      handleSelection: (files: FileList | null) => {
+        if (!files || files.length === 0) {return;}
+        const { addFolder, addFiles } = get().actions;
+
+        const fileList = [...files];
+        const firstFile = fileList[0];
+        const relativePath = firstFile?.webkitRelativePath;
+        const hasFolderStructure = relativePath && fileList.length > 0;
+
+        if (hasFolderStructure) {
+          const pathParts = relativePath.split("/");
+          const folderName = pathParts[0] || "Untitled Folder";
+          addFolder(fileList, folderName);
+        } else {
+          const validFiles = fileList.filter((f) => f.size > 0);
+          if (validFiles.length > 0) {
+            addFiles(validFiles);
+          }
+        }
+      },
 
       removeFile: (id: string) =>
         set((state) => {
@@ -361,7 +319,7 @@ export const useFileUploadStore = create<UploadState>()(
           } else if (isCurrentFileCancelled) {
             const eligibleFiles = state.filesIds.filter((id) => {
               const file = state.fileMap[id];
-              if (file.status !== FileUploadStatus.NOT_STARTED) return false;
+              if (file.status !== FileUploadStatus.NOT_STARTED) {return false;}
               if (file.parentFolderId) {
                 const parent = state.fileMap[file.parentFolderId];
                 return (
@@ -376,38 +334,74 @@ export const useFileUploadStore = create<UploadState>()(
           }
         }),
 
-      cancelUpload: () =>
+      setChunksCompleted: (id: string, chunks: number) =>
         set((state) => {
-          const file = state.fileMap[state.currentFileId];
-          if (file?.controller) {
-            file.controller.abort();
-          }
-          state.fileMap = {};
-          state.filesIds = [];
-          state.currentFileId = "";
-          state.collapse = false;
-          state.uploadOpen = false;
-          state.fileDialogOpen = false;
-          state.folderDialogOpen = false;
+          if (!state.fileMap[id]) {return;}
+          state.fileMap[id].chunksCompleted = chunks;
         }),
-      toggleCollapse: () =>
+
+      setCurrentFileId: (id: string) =>
         set((state) => {
-          state.collapse = !state.collapse;
+          state.currentFileId = id;
         }),
+
+      setETA: (id: string, eta: number) =>
+        set((state) => {
+          if (!state.fileMap[id]) {return;}
+          state.fileMap[id].eta = eta;
+        }),
+
+      setError: (id: string, error: string) =>
+        set((state) => {
+          if (!state.fileMap[id]) {return;}
+          state.fileMap[id].error = error;
+        }),
+
       setFileDialogOpen: (open: boolean) =>
         set((state) => {
           state.fileDialogOpen = open;
         }),
+
+      setFileUploadStatus: (id: string, status: FileUploadStatus) =>
+        set((state) => {
+          if (!state.fileMap[id]) {return;}
+          state.fileMap[id].status = status;
+        }),
+
+      setFolderDialogOpen: (open: boolean) =>
+        set((state) => {
+          state.folderDialogOpen = open;
+        }),
+
+      setFolderId: (id: string, folderId: string) =>
+        set((state) => {
+          if (!state.fileMap[id]) {return;}
+          state.fileMap[id].folderId = folderId;
+        }),
+
+      setProgress: (id: string, progress: number) =>
+        set((state) => {
+          if (!state.fileMap[id]) {return;}
+          state.fileMap[id].progress = progress;
+        }),
+
+      setSpeed: (id: string, speed: number) =>
+        set((state) => {
+          if (!state.fileMap[id]) {return;}
+          state.fileMap[id].speed = speed;
+        }),
+
       setUploadOpen: (open: boolean) =>
         set((state) => {
           state.uploadOpen = open;
         }),
+
       startNextUpload: () =>
         set((state) => {
           const eligibleFiles = state.filesIds.filter((id) => {
             const file = state.fileMap[id];
             // Skip if already processed
-            if (file.status !== FileUploadStatus.NOT_STARTED) return false;
+            if (file.status !== FileUploadStatus.NOT_STARTED) {return false;}
 
             // If file has parent folder, check if parent is uploaded/skipped
             if (file.parentFolderId) {
@@ -424,6 +418,25 @@ export const useFileUploadStore = create<UploadState>()(
 
           state.currentFileId = eligibleFiles[0] || "";
         }),
+
+      toggleCollapse: () =>
+        set((state) => {
+          state.collapse = !state.collapse;
+        }),
+
+      toggleFolderCollapsed: (id: string) =>
+        set((state) => {
+          if (state.fileMap[id]?.isFolder) {
+            state.fileMap[id].collapsed = !state.fileMap[id].collapsed;
+          }
+        }),
     },
+    collapse: false,
+    currentFileId: "",
+    fileDialogOpen: false,
+    fileMap: {},
+    filesIds: [],
+    folderDialogOpen: false,
+    uploadOpen: false,
   })),
 );

@@ -66,8 +66,8 @@ export const DriveFileBrowser = memo(() => {
   const [session] = useSession();
 
   const queryParams: FileListParams = {
-    view: view as BrowseView,
     params: search,
+    view: view as BrowseView,
   };
   const queryOptions = fileQueries.list(queryParams, session?.sessionId);
 
@@ -86,11 +86,11 @@ export const DriveFileBrowser = memo(() => {
   const folderChain = useMemo(() => {
     if (view === "my-drive") {
       return chainLinks(search?.path || "").map(([name, path], index) => ({
+        chain: true,
         id: index + name,
+        isDir: true,
         name,
         path,
-        isDir: true,
-        chain: true,
       }));
     }
 
@@ -105,8 +105,8 @@ export const DriveFileBrowser = memo(() => {
 
     setTimeout(() => {
       listRef.current?.scrollTo({
-        top: positions.get(view + search?.path || "")?.scrollTop ?? 0,
         left: 0,
+        top: positions.get(view + search?.path || "")?.scrollTop ?? 0,
       });
     }, 0);
 

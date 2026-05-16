@@ -1,4 +1,4 @@
-import { memo, useState, useCallback, useEffect } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { FieldError, InputGroup, ListBox, Select, Switch, TextField } from "@heroui/react";
 import clsx from "clsx";
 import type { SettingFieldConfig } from "@/config/settings";
@@ -12,7 +12,7 @@ interface SettingsFieldProps<T> {
 }
 
 function validateUrl(value: string): boolean {
-  if (!value) return true;
+  if (!value) {return true;}
   try {
     const url = new URL(value);
     return url.protocol === "http:" || url.protocol === "https:";
@@ -77,7 +77,7 @@ export const SettingsField = memo(
               aria-label={config.label}
               value={localValue as string}
               onChange={(v) => handleFieldChange(v as T)}
-              isInvalid={!!error}
+              isInvalid={Boolean(error)}
               isDisabled={disabled}
             >
               <InputGroup variant="secondary">
@@ -96,7 +96,7 @@ export const SettingsField = memo(
               aria-label={config.label}
               value={localValue != null ? String(localValue) : ""}
               onChange={(v) => handleFieldChange(Number(v) as T)}
-              isInvalid={!!error}
+              isInvalid={Boolean(error)}
               isDisabled={disabled}
             >
               <InputGroup variant="secondary">

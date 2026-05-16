@@ -24,7 +24,7 @@ export function ProfileDropDown() {
     <Dropdown>
       <Dropdown.Trigger>
         <Avatar className="outline-none shrink-0 hover:ring-4 ring-foreground/5 transition-all">
-          <Avatar.Image src={"/api/users/profile"} />
+          <Avatar.Image src="/api/users/profile" />
         </Avatar>
       </Dropdown.Trigger>
       <Dropdown.Popover>
@@ -32,7 +32,7 @@ export function ProfileDropDown() {
           aria-label="Profile Menu"
           onAction={(key) => {
             if (String(key) === "settings") {
-              navigate({ to: "/settings/$tabId", params: { tabId: "general" } });
+              navigate({ params: { tabId: "general" }, to: "/settings/$tabId" });
             }
           }}
         >

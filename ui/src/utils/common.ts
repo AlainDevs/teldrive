@@ -12,7 +12,7 @@ export const navigateToExternalUrl = (url: string, shouldOpenNewTab = true) => {
 
 export const chainLinks = (path: string) => {
   let pathsoFar = "/";
-  const chains = [["My Drive", pathsoFar]] as Array<[string, string]>;
+  const chains = [["My Drive", pathsoFar]] as [string, string][];
   if (!path || path === "/") {
     return chains;
   }
@@ -28,7 +28,7 @@ export const chainLinks = (path: string) => {
 
 export const chainSharedLinks = (root: string, path: string) => {
   const paths = path?.split("/").slice(1);
-  const chains = [[root, ""]] as Array<[string, string]>;
+  const chains = [[root, ""]] as [string, string][];
 
   if (!path) {
     return chains;
@@ -58,8 +58,7 @@ export function getExtension(fileName: string) {
 export const zeroPad = (num: number | string, places: number) =>
   String(num).padStart(places, "0");
 
-export const copyDataToClipboard = (data: string[]) => {
-  return new Promise((resolve, reject) => {
+export const copyDataToClipboard = (data: string[]) => new Promise((resolve, reject) => {
     const textToCopy = data.join("\n");
 
     navigator.clipboard
@@ -67,13 +66,12 @@ export const copyDataToClipboard = (data: string[]) => {
       .then(() => {
         resolve("copy success");
       })
-      .catch((err) => {
-        const errorMessage = `Unable to copy array to clipboard: ${err}`;
+      .catch((error) => {
+        const errorMessage = `Unable to copy array to clipboard: ${error}`;
         console.error(errorMessage);
         reject(errorMessage);
       });
   });
-};
 
 export function formatDuration(value: number) {
   const minute = Math.floor(value / 60);
@@ -94,18 +92,16 @@ export function formatTime(epochTime: number): string {
 export function encode(str: string) {
   const charMap = {
     "!": "%21",
+    "%00": "\x00",
+    "%20": "+",
     "'": "%27",
     "(": "%28",
     ")": "%29",
     "~": "%7E",
-    "%20": "+",
-    "%00": "\x00",
   } as const;
   return encodeURIComponent(str).replace(
     /[!'()~]|%20|%00/g,
-    function replacer(match) {
-      return charMap[match as keyof typeof charMap];
-    },
+    (match) => charMap[match as keyof typeof charMap],
   );
 }
 
@@ -164,20 +160,16 @@ const isMobileDevice = () => {
 
 export const isMobile = isMobileDevice();
 
-export const chunkArray = <T>(arr: T[], size: number): T[][] => {
-  return Array.from({ length: Math.ceil(arr.length / size) }, (_, index) =>
+export const chunkArray = <T>(arr: T[], size: number): T[][] => Array.from({ length: Math.ceil(arr.length / size) }, (_, index) =>
     arr.slice(index * size, index * size + size),
   );
-};
 
-export const preloadImage = (src: string) => {
-  return new Promise<void>((resolve, reject) => {
+export const preloadImage = (src: string) => new Promise<void>((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve();
     image.onerror = () => reject();
     image.src = src;
   });
-};
 
 export function getNextDate(): string {
   const today: Date = new Date();
@@ -214,12 +206,12 @@ export function formatETA(seconds: number): string {
     const secs = Math.round(seconds % 60);
     return secs > 0 ? `${minutes}m ${secs}s left` : `${minutes}m left`;
   }
-  if (seconds < 86400) {
+  if (seconds < 86_400) {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     return minutes > 0 ? `${hours}h ${minutes}m left` : `${hours}h left`;
   }
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
+  const days = Math.floor(seconds / 86_400);
+  const hours = Math.floor((seconds % 86_400) / 3600);
   return hours > 0 ? `${days}d ${hours}h left` : `${days}d left`;
 }

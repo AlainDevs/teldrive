@@ -7,8 +7,6 @@ import { center } from "@/utils/classes";
 
 export const Route = createFileRoute("/_authed/settings/$tabId")({
   component: SettingsTabView,
-  wrapInSuspense: true,
-  pendingComponent: () => <Spinner className={center} />,
   loader: async ({ context: { queryClient }, params }) => {
     if (params.tabId === "account") {
       await Promise.all([
@@ -22,4 +20,6 @@ export const Route = createFileRoute("/_authed/settings/$tabId")({
       await queryClient.ensureQueryData($api.queryOptions("get", "/periodic-jobs"));
     }
   },
+  pendingComponent: () => <Spinner className={center} />,
+  wrapInSuspense: true,
 });

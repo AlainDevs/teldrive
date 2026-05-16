@@ -19,14 +19,12 @@ const AudioPreview = ({
 }: AudioPreviewProps) => {
   const actions = useAudioStore(audioActions);
 
-  useEffect(() => {
-    return () => actions.reset();
-  }, []);
+  useEffect(() => () => actions.reset(), []);
 
   useEffect(() => {
     actions.setHandlers({
-      prevItem,
       nextItem,
+      prevItem,
     });
     if ("mediaSession" in navigator) {
       navigator.mediaSession.setActionHandler("nexttrack", () =>

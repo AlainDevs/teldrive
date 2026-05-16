@@ -15,10 +15,10 @@ type FetchInput = Parameters<typeof fetch>[0];
 type FetchInit = Parameters<typeof fetch>[1];
 
 const shouldAttemptRefresh = (url: string) => {
-  if (!url.includes("/api/")) return false;
-  if (url.includes("/api/auth/login")) return false;
-  if (url.includes("/api/auth/logout")) return false;
-  if (url.includes("/api/auth/refresh")) return false;
+  if (!url.includes("/api/")) {return false;}
+  if (url.includes("/api/auth/login")) {return false;}
+  if (url.includes("/api/auth/logout")) {return false;}
+  if (url.includes("/api/auth/refresh")) {return false;}
   return true;
 };
 
@@ -32,7 +32,7 @@ const parseErrorMessage = async (res: Response): Promise<string | undefined> => 
 };
 
 const isTokenExpiredError = (message?: string) => {
-  if (!message) return false;
+  if (!message) {return false;}
   return message === "auth.token_expired" || message.includes("auth.token_expired");
 };
 
@@ -52,10 +52,10 @@ const doFetch = async (
     const errorMessage = await parseErrorMessage(response);
     if (isTokenExpiredError(errorMessage) && shouldAttemptRefresh(url)) {
       const refreshRes = await customFetch("/api/auth/refresh", {
-        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        method: "POST",
       });
       if (refreshRes.ok) {
         const retryRes = await doFetch(customFetch, input, init, true);

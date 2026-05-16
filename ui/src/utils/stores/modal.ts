@@ -1,7 +1,7 @@
 import type { FileData } from "file-browser";
 import { create } from "zustand";
 
-type ModalState = {
+interface ModalState {
   open: boolean;
   operation: string;
   type: string;
@@ -15,20 +15,20 @@ type ModalState = {
     setSelectedFiles: (selectedFiles: string[]) => void;
     set: (payload: Partial<ModalState>) => void;
   };
-};
+}
 
 export const useModalStore = create<ModalState>((set) => ({
+  actions: {
+    set: (payload) => set((state) => ({ ...state, ...payload })),
+    setCurrentFile: (currentFile: FileData) => set((state) => ({ ...state, currentFile })),
+    setOpen: (open: boolean) => set((state) => ({ ...state, open })),
+    setOperation: (operation: string) => set((state) => ({ ...state, operation })),
+    setSelectedFiles: (selectedFiles: string[]) => set((state) => ({ ...state, selectedFiles })),
+  },
+  currentFile: {} as FileData,
+  name: "",
   open: false,
   operation: "",
-  type: "",
   selectedFiles: [],
-  name: "",
-  currentFile: {} as FileData,
-  actions: {
-    setOperation: (operation: string) => set((state) => ({ ...state, operation })),
-    setOpen: (open: boolean) => set((state) => ({ ...state, open })),
-    setCurrentFile: (currentFile: FileData) => set((state) => ({ ...state, currentFile })),
-    setSelectedFiles: (selectedFiles: string[]) => set((state) => ({ ...state, selectedFiles })),
-    set: (payload) => set((state) => ({ ...state, ...payload })),
-  },
+  type: "",
 }));

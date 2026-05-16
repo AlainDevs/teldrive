@@ -1138,9 +1138,7 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
-            args?: {
-                [key: string]: unknown;
-            };
+            args?: Record<string, unknown>;
         };
         /** @enum {string} */
         PeriodicJobKind: "clean.old_events" | "clean.stale_uploads" | "clean.pending_files" | "refresh.folder_sizes";
@@ -1174,9 +1172,7 @@ export interface components {
             name?: string;
             enabled?: boolean;
             cronExpression?: string;
-            args?: {
-                [key: string]: unknown;
-            };
+            args?: Record<string, unknown>;
         };
         /** @description User session information containing authentication and profile details */
         Session: {
@@ -1499,18 +1495,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded and a new resource has been created as a result. */
             201: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["AuthAttempt"];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -1530,18 +1522,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["AuthAttempt"];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -1561,16 +1549,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -1594,16 +1578,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -1627,16 +1607,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -1660,16 +1636,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -1699,9 +1671,7 @@ export interface operations {
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -1727,9 +1697,7 @@ export interface operations {
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -1757,9 +1725,7 @@ export interface operations {
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -1787,16 +1753,12 @@ export interface operations {
             };
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -1814,18 +1776,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Event"][];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -1859,9 +1817,7 @@ export interface operations {
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -1914,18 +1870,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["FileList"];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -1947,18 +1899,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded and a new resource has been created as a result. */
             201: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["File"];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -1976,18 +1924,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["CategoryStats"][];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2009,16 +1953,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2040,16 +1980,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2069,18 +2005,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["File"];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2100,16 +2032,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2133,18 +2061,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["File"];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2210,9 +2134,7 @@ export interface operations {
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2274,9 +2196,7 @@ export interface operations {
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2300,18 +2220,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["File"];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2331,18 +2247,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["FileShare"][];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2366,16 +2278,12 @@ export interface operations {
         responses: {
             /** @description The request has succeeded and a new resource has been created as a result. */
             201: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2396,16 +2304,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2430,16 +2334,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2457,18 +2357,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["PeriodicJobSummary"][];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2488,18 +2384,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["PeriodicJobDetail"];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2519,16 +2411,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2552,18 +2440,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["PeriodicJobDetail"];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2583,16 +2467,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2612,16 +2492,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2641,18 +2517,14 @@ export interface operations {
         responses: {
             /** @description The request has been accepted for processing, but processing has not yet completed. */
             202: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["PeriodicJobRunStatus"];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2672,18 +2544,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["FileShareInfo"];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2718,18 +2586,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["FileList"];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2796,9 +2660,7 @@ export interface operations {
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2830,9 +2692,7 @@ export interface operations {
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2852,18 +2712,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["UploadStats"][];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2883,18 +2739,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["UploadPart"][];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2931,18 +2783,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["UploadPart"];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2962,16 +2810,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -2989,18 +2833,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["UserApiKey"][];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -3022,18 +2862,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded and a new resource has been created as a result. */
             201: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["UserApiKeyCreateResult"];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -3053,16 +2889,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -3084,16 +2916,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -3111,16 +2939,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -3138,18 +2962,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Channel"][];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -3171,16 +2991,12 @@ export interface operations {
         responses: {
             /** @description The request has succeeded and a new resource has been created as a result. */
             201: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -3202,16 +3018,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -3229,16 +3041,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -3258,16 +3066,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -3285,18 +3089,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["UserConfig"];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -3327,9 +3127,7 @@ export interface operations {
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -3347,18 +3145,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["UserSession"][];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -3378,16 +3172,12 @@ export interface operations {
         responses: {
             /** @description There is no content to send for this request, but the headers may be useful. */
             204: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content?: never;
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
@@ -3405,18 +3195,14 @@ export interface operations {
         responses: {
             /** @description The request has succeeded. */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["ApiVersion"];
                 };
             };
             /** @description An unexpected error response. */
             default: {
-                headers: {
-                    [name: string]: unknown;
-                };
+                headers: Record<string, unknown>;
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
