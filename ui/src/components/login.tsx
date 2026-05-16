@@ -46,6 +46,7 @@ function sortISOCodes(countryCodes: CountryCode[]) {
 export const isoCodes = sortISOCodes(getKeys(meta.countries))
   .filter((x) => x !== "TA" && x !== "AC")
   .map((code) => ({
+    id: code,
     code,
     country: displayNames.of(code) as string,
     value: `+${getPhoneCode(code)}`,
@@ -423,15 +424,20 @@ export const Login = memo(() => {
   }, [state.form.phoneCode, state.form.phoneNumber, state.loginType]);
 
   return (
-    <div className="mx-auto mt-6 flex w-full max-w-sm flex-col items-center rounded-large bg-surface p-6">
+    <div className="mx-auto mt-12 flex w-full max-w-sm flex-col items-center gap-8">
+      <div className="flex flex-col items-center gap-2">
+        <TelegramIcon className="size-16 text-muted" />
+        <h1 className="text-xl font-semibold text-foreground">Sign in to TelDrive</h1>
+        <p className="text-sm text-muted">Enter your Telegram account details</p>
+      </div>
+
       <form
         autoComplete="off"
-        className="flex w-full flex-col items-center gap-6"
+        className="flex w-full flex-col gap-6 rounded-2xl border border-border bg-surface p-6"
         onSubmit={handleSubmit(onSubmit)}
       >
         {state.loginType === "phone" ? (
           <>
-            <TelegramIcon className="size-20 text-muted" />
             {state.step === 1 && (
               <Controller
                 name="phoneNumber"
@@ -478,28 +484,26 @@ export const Login = memo(() => {
                 )}
               />
             )}
+            {state.step === 3 && (
+              <Controller
+                name="password"
+                control={control}
+                rules={{ required: true }}
+                render={({ field }) => (
+                  <TextField isRequired className="w-full" name="password">
+                    <Label>2FA Password</Label>
+                    <Input placeholder="Enter your 2FA password" type="password" {...field} />
+                    <FieldError />
+                  </TextField>
+                )}
+              />
+            )}
           </>
         ) : (
-          <div className="grid min-h-48 w-full place-content-center">
+          <div className="grid min-h-52 w-full place-content-center">
             {state.step !== 3 && state.qrCode && <QrCode qrCode={state.qrCode} />}
-
             {state.step !== 3 && !state.qrCode && <Spinner className="size-10" />}
           </div>
-        )}
-
-        {state.step === 3 && (
-          <Controller
-            name="password"
-            control={control}
-            rules={{ required: true }}
-            render={({ field }) => (
-              <TextField isRequired className="w-full" name="password">
-                <Label>2FA Password</Label>
-                <Input placeholder="Enter your 2FA password" type="password" {...field} />
-                <FieldError />
-              </TextField>
-            )}
-          />
         )}
 
         <div className="flex w-full flex-col items-center gap-3">
