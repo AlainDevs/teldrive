@@ -270,3 +270,7 @@
 body {
   @apply bg-background text-foreground;
 }
+
+#file-browser {
+  @apply bg-surface/50;
+}

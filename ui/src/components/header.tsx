@@ -102,7 +102,7 @@ const SearchBar = memo(({ className }: SearchBarProps) => {
 });
 
 export default memo(({ auth }: { auth?: boolean }) => (
-    <header className="sticky top-0 z-50 flex items-center min-h-12 xs:min-h-16 px-4 gap-4 pt-2">
+    <header className="flex items-center min-h-12 xs:min-h-16 px-4 gap-4 pt-2">
       <Link
         to="/$view"
         params={{ view: "my-drive" }}

@@ -10,7 +10,7 @@ import { TopLoader } from "@/components/top-progress";
 export const AuthLayout = memo(() => (
     <div className="flex flex-col-reverse md:flex-row h-dvh overflow-hidden">
       <SideNav />
-      <div className="relative flex flex-1 flex-col overflow-x-hidden">
+      <div className="relative flex flex-1 flex-col overflow-hidden">
         <Header auth />
         <main
           className={clsx(
