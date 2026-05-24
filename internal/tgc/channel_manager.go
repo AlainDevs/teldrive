@@ -55,6 +55,9 @@ func (cm *ChannelManager) CurrentChannel(ctx context.Context, userID int64) (int
 	return cache.Fetch(ctx, cm.cache, cache.KeyUserChannel(userID), 0, func() (int64, error) {
 		selected, err := cm.repo.Channels.GetSelected(ctx, userID)
 		if err != nil {
+			if errors.Is(err, repositories.ErrNotFound) {
+				return 0, ErrNoDefaultChannel
+			}
 			return 0, err
 		}
 		return selected.ChannelID, nil
