@@ -127,6 +127,7 @@ func (a *apiService) PeriodicJobsUpdate(ctx context.Context, req *api.PeriodicJo
 		return nil, &apiError{err: err}
 	}
 
+	a.workerStore.Wakeup()
 	return a.PeriodicJobsGet(ctx, api.PeriodicJobsGetParams(params))
 }
 
@@ -174,6 +175,7 @@ func (a *apiService) PeriodicJobsDelete(ctx context.Context, params api.Periodic
 	if err != nil {
 		return &apiError{err: err}
 	}
+	a.workerStore.Wakeup()
 	return nil
 }
 
@@ -213,6 +215,7 @@ func (a *apiService) setPeriodicJobEnabled(ctx context.Context, id string, enabl
 	if err != nil {
 		return &apiError{err: err}
 	}
+	a.workerStore.Wakeup()
 	return nil
 }
 
@@ -393,6 +396,7 @@ func (a *apiService) insertPeriodicPreset(ctx context.Context, userID int64, pre
 	if err != nil {
 		return nil, &apiError{err: err}
 	}
+	a.workerStore.Wakeup()
 	return a.getPeriodicJobRow(ctx, id, userID)
 }
 

@@ -9,13 +9,23 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Store handles PostgreSQL operations for cron background jobs.
 type Store struct {
-	pool *pgxpool.Pool
+	pool   *pgxpool.Pool
+	wakeup func()
 }
 
 func NewStore(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
+}
+
+func (s *Store) SetWakeup(fn func()) {
+	s.wakeup = fn
+}
+
+func (s *Store) Wakeup() {
+	if s.wakeup != nil {
+		s.wakeup()
+	}
 }
 
 func (s *Store) ListDue(ctx context.Context, limit int) ([]*CronJob, error) {
@@ -59,6 +69,7 @@ func (s *Store) MarkDueNow(ctx context.Context, id uuid.UUID, userID int64) erro
 	if tag.RowsAffected() == 0 {
 		return fmt.Errorf("periodic job not found")
 	}
+	s.Wakeup()
 	return nil
 }
 

@@ -7,7 +7,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// Worker is the top-level cron background job runner.
 type Worker struct {
 	Scheduler *CronScheduler
 	Store     *Store
@@ -16,23 +15,24 @@ type Worker struct {
 type Config struct {
 	CronPollEvery time.Duration
 	CronLockID    int64
+	ListenDSN     string
 }
 
 func DefaultConfig() Config {
 	return Config{
-		CronPollEvery: 30 * time.Second,
+		CronPollEvery: 10 * time.Minute,
 		CronLockID:    2123216947,
 	}
 }
 
-func New(pool *pgxpool.Pool, handlers []HandlerDef, cfg Config, log *zap.Logger) *Worker {
-	store := NewStore(pool)
-
+func New(pool *pgxpool.Pool, store *Store, handlers []HandlerDef, cfg Config, log *zap.Logger) *Worker {
 	schedCfg := DefaultCronSchedulerConfig()
-	schedCfg.PollInterval = cfg.CronPollEvery
+	schedCfg.FallbackInterval = cfg.CronPollEvery
 	schedCfg.LockID = cfg.CronLockID
+	schedCfg.ListenDSN = cfg.ListenDSN
 
 	scheduler := NewCronScheduler(pool, store, handlers, schedCfg, log)
+	store.SetWakeup(scheduler.Wakeup)
 
 	return &Worker{
 		Scheduler: scheduler,

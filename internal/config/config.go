@@ -62,7 +62,7 @@ type ServerCmdConfig struct {
 }
 
 type WorkerConfig struct {
-	CronPollEvery time.Duration `default:"30s" description:"Cron background job poll interval"`
+	CronPollEvery time.Duration `default:"10m" description:"Fallback poll interval for cron background jobs when LISTEN/NOTIFY is unavailable"`
 	CronLockID    int64         `default:"2123216947" description:"PostgreSQL advisory lock ID for cron background jobs"`
 }
 

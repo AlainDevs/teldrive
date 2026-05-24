@@ -302,9 +302,10 @@ func buildServer(ctx context.Context, cfg *config.ServerCmdConfig, repos *reposi
 	workerCfg := worker.Config{
 		CronPollEvery: cfg.Worker.CronPollEvery,
 		CronLockID:    cfg.Worker.CronLockID,
+		ListenDSN:     cfg.DB.DataSource,
 	}
 
-	bgWorker := worker.New(repos.Pool, jobExec.WorkerHandlers(), workerCfg, log)
+	bgWorker := worker.New(repos.Pool, workerStore, jobExec.WorkerHandlers(), workerCfg, log)
 
 	sec := auth.NewSecurityHandler(repos.Sessions, repos.APIKeys, cacher, &cfg.JWT)
 	rawSrv := services.NewRawService(apiSrv)
