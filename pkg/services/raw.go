@@ -33,6 +33,12 @@ type rawService struct {
 	api *apiService
 }
 
+const (
+	defaultSSEHeartbeatInterval = 30 * time.Second
+	minSSEHeartbeatInterval     = 5 * time.Second
+	maxSSEHeartbeatInterval     = 5 * time.Minute
+)
+
 func NewRawService(api *apiService) *rawService {
 	return &rawService{api: api}
 }
@@ -46,9 +52,15 @@ func (s *rawService) EventsEventsStream(ctx context.Context, params api.EventsEv
 	if err != nil {
 		return &apiError{err: err, code: http.StatusBadRequest}
 	}
-	interval := 30 * time.Second
+	interval := defaultSSEHeartbeatInterval
 	if v, ok := params.Interval.Get(); ok && v > 0 {
 		interval = time.Duration(v) * time.Millisecond
+		if interval < minSSEHeartbeatInterval {
+			interval = minSSEHeartbeatInterval
+		}
+		if interval > maxSSEHeartbeatInterval {
+			interval = maxSSEHeartbeatInterval
+		}
 	}
 	userID := auth.User(ctx)
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -252,7 +264,6 @@ func (s *rawService) streamFile(ctx context.Context, w http.ResponseWriter, file
 
 	// Slow path: only initialize Telegram when varc is disabled or the
 	// requested range is missing locally.
-	w.WriteHeader(status)
 	tokens, err := s.api.channelManager.BotTokens(ctx, session.UserID)
 	if err != nil {
 		logger.Error("stream.bots_fetch_failed", zap.Error(err))
@@ -319,11 +330,13 @@ func (s *rawService) streamFile(ctx context.Context, w http.ResponseWriter, file
 			}
 			defer vr.Close()
 
+			w.WriteHeader(status)
 			_, err = io.Copy(w, io.NewSectionReader(vr, start, contentLength))
 			return err
 		}
 
 		// No disk cache — serve the requested HTTP range directly.
+		w.WriteHeader(status)
 		_, err = io.Copy(w, io.NewSectionReader(fileReader, start, contentLength))
 		return err
 	}

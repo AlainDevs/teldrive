@@ -3,15 +3,16 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 type operationPatch struct {
-	pathText   string
-	methodText string
-	mediaType  string
-	fieldKey   string
-	fieldValue string
+	path      string
+	method    string
+	mediaType string
+	fieldKey  string
+	fieldBool bool
 }
 
 func main() {
@@ -29,195 +30,142 @@ func run() error {
 		return err
 	}
 
-	updated := string(content)
+	var doc yaml.Node
+	if err := yaml.Unmarshal(content, &doc); err != nil {
+		return fmt.Errorf("unmarshal yaml: %w", err)
+	}
+
 	patches := []operationPatch{
 		{
-			pathText:   "/auth/login:",
-			methodText: "post:",
-			fieldKey:   "x-ogen-raw-response",
-			fieldValue: "true",
+			path:      "/files/{id}/content",
+			method:    "get",
+			mediaType: "application/octet-stream",
+			fieldKey:  "x-ogen-raw-response",
+			fieldBool: true,
 		},
 		{
-			pathText:   "/auth/logout:",
-			methodText: "post:",
-			fieldKey:   "x-ogen-raw-response",
-			fieldValue: "true",
+			path:      "/events/stream",
+			method:    "get",
+			mediaType: "text/event-stream",
+			fieldKey:  "x-ogen-raw-response",
+			fieldBool: true,
 		},
 		{
-			pathText:   "/auth/refresh:",
-			methodText: "post:",
-			fieldKey:   "x-ogen-raw-response",
-			fieldValue: "true",
-		},
-		{
-			pathText:   "/files/{id}/content:",
-			methodText: "get:",
-			mediaType:  "application/octet-stream:",
-			fieldKey:   "x-ogen-raw-response",
-			fieldValue: "true",
-		},
-		{
-			pathText:   "/events/stream:",
-			methodText: "get:",
-			mediaType:  "text/event-stream:",
-			fieldKey:   "x-ogen-raw-response",
-			fieldValue: "true",
-		},
-		{
-			pathText:   "/shares/{id}/files/{fileId}/content:",
-			methodText: "get:",
-			mediaType:  "application/octet-stream:",
-			fieldKey:   "x-ogen-raw-response",
-			fieldValue: "true",
+			path:      "/shares/{id}/files/{fileId}/content",
+			method:    "get",
+			mediaType: "application/octet-stream",
+			fieldKey:  "x-ogen-raw-response",
+			fieldBool: true,
 		},
 	}
 
 	for _, patch := range patches {
-		updated, err = insertOperationField(updated, patch)
-		if err != nil {
+		if err := insertOperationField(&doc, patch); err != nil {
 			return err
 		}
 	}
 
-	if updated == string(content) {
+	updated, err := yaml.Marshal(&doc)
+	if err != nil {
+		return fmt.Errorf("marshal yaml: %w", err)
+	}
+
+	if string(updated) == string(content) {
 		return nil
 	}
 
-	return os.WriteFile(filePath, []byte(updated), 0o644)
+	return os.WriteFile(filePath, updated, 0o644)
 }
 
-func insertOperationField(content string, patch operationPatch) (string, error) {
-	lines := strings.Split(content, "\n")
-	pathIndex := -1
-	for i, line := range lines {
-		if strings.TrimSpace(line) == patch.pathText {
-			pathIndex = i
-			break
-		}
-	}
-	if pathIndex == -1 {
-		return "", fmt.Errorf("path block not found: %s", patch.pathText)
+func insertOperationField(doc *yaml.Node, patch operationPatch) error {
+	root, err := documentMapping(doc)
+	if err != nil {
+		return err
 	}
 
-	methodIndex := -1
-	for i := pathIndex + 1; i < len(lines); i++ {
-		line := lines[i]
-		if strings.HasPrefix(line, "  /") {
-			break
-		}
-		if strings.TrimSpace(line) == patch.methodText {
-			methodIndex = i
-			break
-		}
-	}
-	if methodIndex == -1 {
-		return "", fmt.Errorf("method block not found for %s %s", patch.pathText, patch.methodText)
+	paths, ok := mappingValue(root, "paths")
+	if !ok {
+		return fmt.Errorf("paths block not found")
 	}
 
-	if patch.mediaType == "" {
-		methodIndent := leadingWhitespace(lines[methodIndex])
-		fieldLine := methodIndent + "  " + patch.fieldKey + ": " + patch.fieldValue
-		methodEnd := len(lines)
-		for i := methodIndex + 1; i < len(lines); i++ {
-			line := lines[i]
-			if strings.HasPrefix(line, "    ") && !strings.HasPrefix(line, methodIndent+"  ") {
-				methodEnd = i
-				break
-			}
-			if strings.HasPrefix(line, "  /") {
-				methodEnd = i
-				break
-			}
-		}
-		for i := methodIndex + 1; i < methodEnd; i++ {
-			if lines[i] == fieldLine {
-				return content, nil
-			}
-		}
-		insertAt := methodIndex + 1
-		updated := make([]string, 0, len(lines)+1)
-		updated = append(updated, lines[:insertAt]...)
-		updated = append(updated, fieldLine)
-		updated = append(updated, lines[insertAt:]...)
-		result := strings.Join(updated, "\n")
-		if strings.HasSuffix(content, "\n") && !strings.HasSuffix(result, "\n") {
-			result += "\n"
-		}
-		if !strings.HasSuffix(content, "\n") {
-			result = strings.TrimSuffix(result, "\n")
-		}
-		return result, nil
+	pathNode, ok := mappingValue(paths, patch.path)
+	if !ok {
+		return fmt.Errorf("path block not found: %s", patch.path)
 	}
 
-	methodEnd := len(lines)
-	for i := methodIndex + 1; i < len(lines); i++ {
-		line := lines[i]
-		if strings.HasPrefix(line, "    ") && !strings.HasPrefix(line, "      ") {
-			methodEnd = i
-			break
-		}
-		if strings.HasPrefix(line, "  /") {
-			methodEnd = i
-			break
-		}
+	methodNode, ok := mappingValue(pathNode, patch.method)
+	if !ok {
+		return fmt.Errorf("method block not found for %s %s", patch.path, patch.method)
 	}
 
-	inserted := false
-	mediaMatches := 0
-	for i := methodIndex + 1; i < methodEnd; i++ {
-		if strings.TrimSpace(lines[i]) != patch.mediaType {
+	responses, ok := mappingValue(methodNode, "responses")
+	if !ok {
+		return fmt.Errorf("responses block not found for %s %s", patch.path, patch.method)
+	}
+
+	foundMedia := false
+	for i := 1; i < len(responses.Content); i += 2 {
+		responseNode := responses.Content[i]
+		contentNode, ok := mappingValue(responseNode, "content")
+		if !ok {
 			continue
 		}
-		mediaMatches++
-		mediaIndent := leadingWhitespace(lines[i])
-		fieldLine := mediaIndent + "  " + patch.fieldKey + ": " + patch.fieldValue
-		mediaEnd := methodEnd
-		for j := i + 1; j < methodEnd; j++ {
-			line := lines[j]
-			if len(leadingWhitespace(line)) <= len(mediaIndent) && strings.TrimSpace(line) != "" {
-				mediaEnd = j
-				break
-			}
-		}
-		exists := false
-		for j := i + 1; j < mediaEnd; j++ {
-			if lines[j] == fieldLine {
-				exists = true
-				break
-			}
-		}
-		if exists {
+		mediaNode, ok := mappingValue(contentNode, patch.mediaType)
+		if !ok {
 			continue
 		}
-		insertAt := i + 1
-		updated := make([]string, 0, len(lines)+1)
-		updated = append(updated, lines[:insertAt]...)
-		updated = append(updated, fieldLine)
-		updated = append(updated, lines[insertAt:]...)
-		lines = updated
-		methodEnd++
-		i++
-		inserted = true
+		setMappingBool(mediaNode, patch.fieldKey, patch.fieldBool)
+		foundMedia = true
 	}
 
-	if mediaMatches == 0 {
-		return "", fmt.Errorf("media type block not found for %s %s %s", patch.pathText, patch.methodText, patch.mediaType)
-	}
-	if !inserted {
-		return content, nil
+	if !foundMedia {
+		return fmt.Errorf("media type block not found for %s %s %s", patch.path, patch.method, patch.mediaType)
 	}
 
-	result := strings.Join(lines, "\n")
-	if strings.HasSuffix(content, "\n") && !strings.HasSuffix(result, "\n") {
-		result += "\n"
-	}
-	if !strings.HasSuffix(content, "\n") {
-		result = strings.TrimSuffix(result, "\n")
-	}
-	return result, nil
+	return nil
 }
 
-func leadingWhitespace(line string) string {
-	trimmed := strings.TrimLeft(line, " \t")
-	return line[:len(line)-len(trimmed)]
+func documentMapping(doc *yaml.Node) (*yaml.Node, error) {
+	if doc == nil || doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 {
+		return nil, fmt.Errorf("invalid yaml document")
+	}
+	root := doc.Content[0]
+	if root.Kind != yaml.MappingNode {
+		return nil, fmt.Errorf("root is not a mapping")
+	}
+	return root, nil
+}
+
+func mappingValue(node *yaml.Node, key string) (*yaml.Node, bool) {
+	if node == nil || node.Kind != yaml.MappingNode {
+		return nil, false
+	}
+	for i := 0; i < len(node.Content)-1; i += 2 {
+		if node.Content[i].Value == key {
+			return node.Content[i+1], true
+		}
+	}
+	return nil, false
+}
+
+func setMappingBool(node *yaml.Node, key string, val bool) {
+	if node == nil || node.Kind != yaml.MappingNode {
+		return
+	}
+	boolValue := "false"
+	if val {
+		boolValue = "true"
+	}
+	for i := 0; i < len(node.Content)-1; i += 2 {
+		if node.Content[i].Value == key {
+			node.Content[i+1].Kind = yaml.ScalarNode
+			node.Content[i+1].Tag = "!!bool"
+			node.Content[i+1].Value = boolValue
+			return
+		}
+	}
+	node.Content = append(node.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: boolValue},
+	)
 }

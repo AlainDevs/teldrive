@@ -28,7 +28,7 @@ var (
 
 func (a *apiService) UploadsDelete(ctx context.Context, params api.UploadsDeleteParams) error {
 	if err := a.repo.Uploads.Delete(ctx, params.ID); err != nil {
-		return &api.ErrorStatusCode{StatusCode: 500, Response: api.Error{Message: err.Error(), Code: 500}}
+		return &apiError{err: err}
 	}
 	return nil
 }

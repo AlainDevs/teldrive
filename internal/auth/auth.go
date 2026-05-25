@@ -174,7 +174,11 @@ func (s *securityHandler) HandleSessionHashAuth(ctx context.Context, operationNa
 	if operationName != api.FilesStreamOperation && operationName != api.FilesStreamHeadOperation {
 		return nil, &ogenerrors.SecurityError{Err: ErrAuthSessionInvalid}
 	}
-	session, err := SessionByID(ctx, s.sessions, s.cache, uuid.MustParse(t.APIKey))
+	sessionID, err := uuid.Parse(t.APIKey)
+	if err != nil {
+		return nil, &ogenerrors.SecurityError{Err: ErrAuthSessionInvalid}
+	}
+	session, err := SessionByID(ctx, s.sessions, s.cache, sessionID)
 	if err != nil {
 		return nil, &ogenerrors.SecurityError{Err: ErrAuthSessionInvalid}
 	}

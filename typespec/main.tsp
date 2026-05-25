@@ -33,7 +33,8 @@ model SessionHashAuth {
   name: "sid";
 }
 
-alias ApiAuth = BearerAuth | AccessTokenCookieAuth | XApiKeyHeaderAuth | SessionHashAuth;
+alias ApiAuth = BearerAuth | AccessTokenCookieAuth | XApiKeyHeaderAuth;
+alias StreamAuth = ApiAuth | SessionHashAuth;
 
 @doc("File streaming response")
 model FileStream {
@@ -858,6 +859,7 @@ interface Files {
   @route("/{id}/content")
   @get
   @summary("Stream or Download file")
+  @useAuth(StreamAuth)
   stream(
     @path id: UUID,
     @query download?: "0" | "1" = "0",
@@ -867,6 +869,7 @@ interface Files {
   @route("/{id}/content")
   @head
   @summary("Get file content headers")
+  @useAuth(StreamAuth)
   streamHead(
     @path id: UUID,
     @query download?: "0" | "1" = "0",
