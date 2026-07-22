@@ -60,13 +60,9 @@ export const CustomActions = {
     requiresSelection: true,
   } as const),
   ShareFiles: defineFileAction({
-    button: {
-      contextMenu: true,
-      icon: Share,
-      name: "Share",
-    },
     id: "share_files",
-    requiresSelection: true,
+    target: { source: "selection-or-context-item", min: 1, max: 1 },
+    ui: { contextMenu: true, toolbar: true, icon: Share, name: "Share" },
   } as const),
   UploadFolder: defineFileAction({
     button: {
@@ -206,8 +202,12 @@ export const useFileAction = (
         }
 
         case CustomActions.ShareFiles.id: {
+          const fileToShare = data.state.selectedFilesForAction[0];
+          if (!fileToShare) {
+            break;
+          }
           actions.set({
-            currentFile: data.state.selectedFiles[0],
+            currentFile: fileToShare,
             open: true,
             operation: CustomActions.ShareFiles.id,
           });

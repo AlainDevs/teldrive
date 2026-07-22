@@ -146,17 +146,8 @@ func (cm *ChannelManager) CreateNewChannel(ctx context.Context, newChannelName s
 	peer := storage.Peer{}
 	peer.FromChat(newChannel)
 	peerStorage.Add(ctx, peer)
-	botTokens, err := cm.BotTokens(ctx, userID)
-	if err != nil {
+	if err := cm.addBotsToNewChannel(ctx, userID, newChannelID); err != nil {
 		return 0, err
-	}
-	if len(botTokens) > 0 {
-		err = cm.AddBotsToChannel(ctx, userID, newChannelID, botTokens, false)
-		if err != nil {
-			return 0, err
-		}
-	} else {
-		return 0, fmt.Errorf("add bot tokens before continuing")
 	}
 
 	selected := setDefault
@@ -195,6 +186,20 @@ func (cm *ChannelManager) CreateNewChannel(ctx context.Context, newChannelName s
 	}
 
 	return newChannelID, nil
+}
+
+func (cm *ChannelManager) addBotsToNewChannel(ctx context.Context, userID, newChannelID int64) error {
+	botTokens, err := cm.BotTokens(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if len(botTokens) > 0 {
+		err = cm.AddBotsToChannel(ctx, userID, newChannelID, botTokens, false)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // generateLockID creates a unique lock ID from user ID and operation

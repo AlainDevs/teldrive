@@ -185,8 +185,12 @@ export const Login = memo(() => {
       }
       loginAttemptRef.current = attempt.id;
       setActiveAttempt(null);
-      submitLogin({ body: attempt.session as never }).finally(() => {
-        // Window.location.replace(new URL(redirect || "/", window.location.origin));
+      submitLogin({ body: attempt.session as never }).then(() => {
+        window.location.replace(redirect || "/");
+      }).catch(() => {
+        loginAttemptRef.current = null;
+        setState((prev) => ({ ...prev, isLoading: false }));
+        toast.error("Failed to complete login");
       });
       return;
     }
