@@ -156,6 +156,58 @@ func (r *JetFileRepository) GetByIDAndUser(ctx context.Context, id uuid.UUID, us
 	return &out, nil
 }
 
+func (r *JetFileRepository) GetByIDAndUserInSubtree(ctx context.Context, id uuid.UUID, userID int64, rootID uuid.UUID) (*model.Files, error) {
+	query := `
+WITH RECURSIVE subtree AS (
+	SELECT id, ARRAY[id]::uuid[] AS path
+	FROM files
+	WHERE id = $3 AND user_id = $2 AND status = 'active' AND type = 'folder'
+
+	UNION ALL
+
+	SELECT f.id, s.path || f.id
+	FROM files f
+	JOIN subtree s ON f.parent_id = s.id
+	WHERE f.user_id = $2 AND f.status = 'active' AND NOT (f.id = ANY(s.path))
+)
+SELECT id, name, type, mime_type, size, user_id, parent_id, status, channel_id, parts, encrypted, category, hash, created_at, updated_at
+FROM files
+WHERE id = $1
+	AND user_id = $2
+	AND status = 'active'
+	AND id IN (SELECT id FROM subtree)
+`
+
+	var out model.Files
+	var parts dbtypes.JSONB[dbtypes.Parts]
+	err := r.db.executor(ctx).QueryRow(ctx, query, id, userID, rootID).Scan(
+		&out.ID,
+		&out.Name,
+		&out.Type,
+		&out.MimeType,
+		&out.Size,
+		&out.UserID,
+		&out.ParentID,
+		&out.Status,
+		&out.ChannelID,
+		&parts,
+		&out.Encrypted,
+		&out.Category,
+		&out.Hash,
+		&out.CreatedAt,
+		&out.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, normalizeDBError(err)
+	}
+	out.Parts = &parts
+
+	return &out, nil
+}
+
 func (r *JetFileRepository) GetByChannelID(ctx context.Context, channelID int64) ([]model.Files, error) {
 	stmt := selectFilesForRead(table.Files).FROM(table.Files).WHERE(
 		table.Files.ChannelID.EQ(postgres.Int64(channelID)).

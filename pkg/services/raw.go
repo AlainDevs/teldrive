@@ -164,16 +164,20 @@ func (s *rawService) SharesStream(ctx context.Context, params api.SharesStreamPa
 	if err != nil {
 		return err
 	}
+	fileID := uuid.UUID(params.FileId)
+	file, err := s.authorizedSharedStreamFile(ctx, share, fileID)
+	if err != nil {
+		return err
+	}
 	session := &jetmodel.Sessions{UserID: share.UserID}
 	download := false
 	if v, ok := params.Download.Get(); ok && v == api.SharesStreamDownload1 {
 		download = true
 	}
-	return s.streamFile(ctx, w, uuid.UUID(params.FileId), session, "", download)
+	return s.streamLoadedFile(ctx, w, file, session, "", download)
 }
 
 func (s *rawService) streamFile(ctx context.Context, w http.ResponseWriter, fileID uuid.UUID, session *jetmodel.Sessions, rawRange string, download bool) error {
-	logger := logging.Component("FILE").With(zap.String("file_id", fileID.String()), zap.Int64("user_id", session.UserID))
 	file, err := cache.Fetch(ctx, s.api.cache, cache.KeyFile(fileID.String()), 0, func() (*jetmodel.Files, error) {
 		return s.api.repo.Files.GetByID(ctx, fileID)
 	})
@@ -183,6 +187,43 @@ func (s *rawService) streamFile(ctx context.Context, w http.ResponseWriter, file
 		}
 		return &apiError{err: err, code: http.StatusBadRequest}
 	}
+	return s.streamLoadedFile(ctx, w, file, session, rawRange, download)
+}
+
+func (s *rawService) authorizedSharedStreamFile(ctx context.Context, share *fileShare, fileID uuid.UUID) (*jetmodel.Files, error) {
+	sharedID, err := uuid.Parse(share.FileID)
+	if err != nil {
+		return nil, &apiError{err: err, code: http.StatusBadRequest}
+	}
+
+	var file *jetmodel.Files
+	switch share.Type {
+	case api.FileShareInfoTypeFile:
+		if fileID != sharedID {
+			return nil, &apiError{err: fileNotFound(fileID, repositories.ErrNotFound)}
+		}
+		file, err = s.api.repo.Files.GetByIDAndUser(ctx, fileID, share.UserID)
+	case api.FileShareInfoTypeFolder:
+		file, err = s.api.repo.Files.GetByIDAndUserInSubtree(ctx, fileID, share.UserID, sharedID)
+	default:
+		return nil, &apiError{err: fileNotFound(fileID, repositories.ErrNotFound)}
+	}
+	if err != nil {
+		if errors.Is(err, repositories.ErrNotFound) {
+			return nil, &apiError{err: fileNotFound(fileID, err)}
+		}
+		return nil, &apiError{err: err}
+	}
+	if file.Type != string(api.FileTypeFile) {
+		return nil, &apiError{err: fileNotFound(fileID, repositories.ErrNotFound)}
+	}
+
+	return file, nil
+}
+
+func (s *rawService) streamLoadedFile(ctx context.Context, w http.ResponseWriter, file *jetmodel.Files, session *jetmodel.Sessions, rawRange string, download bool) error {
+	fileID := file.ID
+	logger := logging.Component("FILE").With(zap.String("file_id", fileID.String()), zap.Int64("user_id", session.UserID))
 	// Do not write headers yet. First check whether varc already has the
 	// requested byte range. If it does, we can serve directly from disk and
 	// skip BotTokens/AuthClient/BotClient entirely.
@@ -277,6 +318,17 @@ func (s *rawService) streamFile(ctx context.Context, w http.ResponseWriter, file
 		token  string
 	)
 	if len(tokens) == 0 {
+		if session.TgSession == "" {
+			sessions, err := s.api.repo.Sessions.GetByUserID(ctx, session.UserID)
+			if err != nil {
+				logger.Error("stream.owner_session_fetch_failed", zap.Error(err))
+				return err
+			}
+			if len(sessions) == 0 {
+				return fmt.Errorf("no active owner session found")
+			}
+			session.TgSession = sessions[0].TgSession
+		}
 		client, err = s.api.telegram.AuthClient(ctx, session.TgSession, 5)
 		if err != nil {
 			logger.Error("stream.auth_client_failed", zap.Error(err))

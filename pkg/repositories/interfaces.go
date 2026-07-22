@@ -109,6 +109,7 @@ type FileRepository interface {
 	UpsertActive(ctx context.Context, file *model.Files) error
 	GetByID(ctx context.Context, id uuid.UUID) (*model.Files, error)
 	GetByIDAndUser(ctx context.Context, id uuid.UUID, userID int64) (*model.Files, error)
+	GetByIDAndUserInSubtree(ctx context.Context, id uuid.UUID, userID int64, rootID uuid.UUID) (*model.Files, error)
 	GetByChannelID(ctx context.Context, channelID int64) ([]model.Files, error)
 	GetActiveByNameAndParent(ctx context.Context, userID int64, name string, parentID *uuid.UUID) (*model.Files, error)
 	Update(ctx context.Context, id uuid.UUID, update FileUpdate) error

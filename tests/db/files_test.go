@@ -144,6 +144,117 @@ func TestFileGetByIDAndUser(t *testing.T) {
 	}
 }
 
+func TestFileGetByIDAndUserInSubtree(t *testing.T) {
+	s := newHarness(t)
+	ctx := context.Background()
+	uid := int64(7013)
+	otherUID := int64(7014)
+	s.ensureUserExists(uid)
+	s.ensureUserExists(otherUID)
+
+	fileRepo := repositories.NewJetFileRepository(s.pool)
+
+	rootID, err := fileRepo.CreateDirectories(ctx, uid, "/share-root")
+	if err != nil {
+		t.Fatalf("create root dir: %v", err)
+	}
+	nestedID, err := fileRepo.CreateDirectories(ctx, uid, "/share-root/nested")
+	if err != nil {
+		t.Fatalf("create nested dir: %v", err)
+	}
+	siblingID, err := fileRepo.CreateDirectories(ctx, uid, "/share-sibling")
+	if err != nil {
+		t.Fatalf("create sibling dir: %v", err)
+	}
+	otherRootID, err := fileRepo.CreateDirectories(ctx, otherUID, "/share-root")
+	if err != nil {
+		t.Fatalf("create other root dir: %v", err)
+	}
+	otherNestedID, err := fileRepo.CreateDirectories(ctx, otherUID, "/share-root/nested")
+	if err != nil {
+		t.Fatalf("create other nested dir: %v", err)
+	}
+
+	directFileID := createTestFile(t, ctx, fileRepo, uid, "direct.txt", rootID, "active")
+	nestedFileID := createTestFile(t, ctx, fileRepo, uid, "nested.txt", nestedID, "active")
+	siblingFileID := createTestFile(t, ctx, fileRepo, uid, "sibling.txt", siblingID, "active")
+	otherUserFileID := createTestFile(t, ctx, fileRepo, otherUID, "other.txt", otherNestedID, "active")
+	inactiveFileID := createTestFile(t, ctx, fileRepo, uid, "inactive.txt", nestedID, "pending_deletion")
+
+	got, err := fileRepo.GetByIDAndUserInSubtree(ctx, directFileID, uid, *rootID)
+	if err != nil {
+		t.Fatalf("direct descendant lookup failed: %v", err)
+	}
+	if got.ID != directFileID {
+		t.Fatalf("direct descendant ID mismatch: got %v want %v", got.ID, directFileID)
+	}
+
+	got, err = fileRepo.GetByIDAndUserInSubtree(ctx, nestedFileID, uid, *rootID)
+	if err != nil {
+		t.Fatalf("nested descendant lookup failed: %v", err)
+	}
+	if got.ID != nestedFileID {
+		t.Fatalf("nested descendant ID mismatch: got %v want %v", got.ID, nestedFileID)
+	}
+
+	for name, fileID := range map[string]uuid.UUID{
+		"sibling":            siblingFileID,
+		"other user":         otherUserFileID,
+		"wrong-owner root":   nestedFileID,
+		"inactive requested": inactiveFileID,
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := *rootID
+			userID := uid
+			if name == "wrong-owner root" {
+				root = *otherRootID
+			}
+			_, err := fileRepo.GetByIDAndUserInSubtree(ctx, fileID, userID, root)
+			if err != repositories.ErrNotFound {
+				t.Fatalf("expected ErrNotFound, got %v", err)
+			}
+		})
+	}
+
+	if err := fileRepo.Update(ctx, *rootID, repositories.FileUpdate{ParentID: nestedID}); err != nil {
+		t.Fatalf("create root/nested folder cycle: %v", err)
+	}
+	cycleCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	got, err = fileRepo.GetByIDAndUserInSubtree(cycleCtx, nestedFileID, uid, *rootID)
+	if err != nil {
+		t.Fatalf("cyclic subtree lookup failed: %v", err)
+	}
+	if got.ID != nestedFileID {
+		t.Fatalf("cyclic subtree ID mismatch: got %v want %v", got.ID, nestedFileID)
+	}
+}
+
+func createTestFile(t *testing.T, ctx context.Context, fileRepo repositories.FileRepository, userID int64, name string, parentID *uuid.UUID, status string) uuid.UUID {
+	t.Helper()
+
+	now := time.Now().UTC()
+	size := int64(12)
+	fileID := uuid.New()
+	file := &jetmodel.Files{
+		ID:        fileID,
+		Name:      name,
+		Type:      "file",
+		MimeType:  "text/plain",
+		UserID:    userID,
+		ParentID:  parentID,
+		Status:    &status,
+		Size:      &size,
+		Encrypted: false,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := fileRepo.Create(ctx, file); err != nil {
+		t.Fatalf("create %s: %v", name, err)
+	}
+	return fileID
+}
+
 func TestFileUpdateName(t *testing.T) {
 	s := newHarness(t)
 	ctx := context.Background()
