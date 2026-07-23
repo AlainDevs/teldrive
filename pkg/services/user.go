@@ -349,6 +349,11 @@ func (a *apiService) UsersStats(ctx context.Context) (*api.UserConfig, error) {
 		err       error
 	)
 
+	user, err := a.repo.Users.GetByID(ctx, userId)
+	if err != nil {
+		return nil, &apiError{err: err}
+	}
+
 	channelId, err = a.channelManager.CurrentChannel(ctx, userId)
 	if err != nil {
 		channelId = 0
@@ -359,7 +364,26 @@ func (a *apiService) UsersStats(ctx context.Context) (*api.UserConfig, error) {
 	if err != nil {
 		tokens = []string{}
 	}
-	return &api.UserConfig{Bots: tokens, ChannelId: channelId}, nil
+	return &api.UserConfig{Bots: tokens, ChannelId: channelId, EncryptFiles: user.EncryptFiles}, nil
+}
+
+func (a *apiService) UsersUpdateConfig(ctx context.Context, req *api.UserConfigUpdate) error {
+	userID := auth.User(ctx)
+	update := repositories.UserUpdate{}
+	if req.EncryptFiles.IsSet() {
+		update.EncryptFiles = &req.EncryptFiles.Value
+	}
+	if err := a.repo.WithTx(ctx, func(txCtx context.Context) error {
+		if req.EncryptFiles.IsSet() {
+			if _, err := a.repo.Users.GetByIDForUpdate(txCtx, userID); err != nil {
+				return err
+			}
+		}
+		return a.repo.Users.Update(txCtx, userID, update)
+	}); err != nil {
+		return &apiError{err: err}
+	}
+	return nil
 }
 
 func (a *apiService) UsersUpdateChannel(ctx context.Context, req *api.ChannelUpdate) error {

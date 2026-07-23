@@ -68,7 +68,7 @@ func (r *JetShareRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.
 }
 
 func (r *JetShareRepository) Update(ctx context.Context, id uuid.UUID, update ShareUpdate) error {
-	updates := make([]postgres.ColumnAssigment, 0, 3)
+	updates := make([]postgres.ColumnAssigment, 0, 4)
 
 	if update.Password != nil {
 		updates = append(updates, table.FileShares.Password.SET(postgres.String(*update.Password)))
@@ -76,8 +76,15 @@ func (r *JetShareRepository) Update(ctx context.Context, id uuid.UUID, update Sh
 	if update.ExpiresAt != nil {
 		updates = append(updates, table.FileShares.ExpiresAt.SET(postgres.TimestampT(*update.ExpiresAt)))
 	}
+	if update.AllowUpload != nil {
+		updates = append(updates, table.FileShares.AllowUpload.SET(postgres.Bool(*update.AllowUpload)))
+	}
 
-	updates = append(updates, table.FileShares.UpdatedAt.SET(postgres.TimestampT(time.Now().UTC())))
+	updatedAt := time.Now().UTC()
+	if update.UpdatedAt != nil {
+		updatedAt = update.UpdatedAt.UTC()
+	}
+	updates = append(updates, table.FileShares.UpdatedAt.SET(postgres.TimestampT(updatedAt)))
 
 	stmt := table.FileShares.UPDATE().WHERE(table.FileShares.ID.EQ(postgres.UUID(id)))
 	stmt = stmt.SET(updates[0], assignmentArgs(updates[1:])...)

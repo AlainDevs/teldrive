@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -108,6 +109,92 @@ func TestStreamFile_InvalidRangeReturns416(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusInternalServerError {
 		t.Fatalf("expected 500 for fixture without streamable content, got %d", resp.StatusCode)
+	}
+}
+
+func TestStreamFileHead_RangeErrors(t *testing.T) {
+	s := newHarness(t)
+	ctx := context.Background()
+	token := loginAndGetToken(t, s, 9104, "stream-user-9104")
+	client := s.newClientWithToken(token)
+	if err := client.UsersUpdateChannel(ctx, &api.ChannelUpdate{ChannelId: api.NewOptInt64(910084), ChannelName: api.NewOptString("stream-head-range")}); err != nil {
+		t.Fatalf("UsersUpdateChannel failed: %v", err)
+	}
+
+	for _, size := range []int64{0, 100} {
+		file, err := client.FilesCreate(ctx, &api.File{
+			Name:      fmt.Sprintf("head-range-%d.txt", size),
+			Type:      api.FileTypeFile,
+			Path:      api.NewOptString("/"),
+			MimeType:  api.NewOptString("text/plain"),
+			ChannelId: api.NewOptInt64(910084),
+			Size:      api.NewOptInt64(size),
+		})
+		if err != nil {
+			t.Fatalf("FilesCreate size %d failed: %v", size, err)
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodHead, s.server.URL+"/files/"+uuid.UUID(file.ID.Value).String()+"/content", nil)
+		if err != nil {
+			t.Fatalf("new HEAD request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Cookie", "access_token="+token)
+		req.Header.Set("Range", "bytes=1000-2000")
+
+		resp, err := s.httpCli.Do(req)
+		if err != nil {
+			t.Fatalf("HEAD request failed: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusRequestedRangeNotSatisfiable {
+			t.Fatalf("size %d status = %d, want 416", size, resp.StatusCode)
+		}
+		want := fmt.Sprintf("bytes */%d", size)
+		if got := resp.Header.Get("Content-Range"); got != want {
+			t.Fatalf("size %d Content-Range = %q, want %q", size, got, want)
+		}
+	}
+}
+
+func TestStreamFile_MultipleRangesReturn400RegardlessOfOrder(t *testing.T) {
+	s := newHarness(t)
+	ctx := context.Background()
+	token := loginAndGetToken(t, s, 9105, "stream-user-9105")
+	client := s.newClientWithToken(token)
+	if err := client.UsersUpdateChannel(ctx, &api.ChannelUpdate{ChannelId: api.NewOptInt64(910085), ChannelName: api.NewOptString("stream-multi-range")}); err != nil {
+		t.Fatalf("UsersUpdateChannel failed: %v", err)
+	}
+	file, err := client.FilesCreate(ctx, &api.File{
+		Name:      "multi-range.txt",
+		Type:      api.FileTypeFile,
+		Path:      api.NewOptString("/"),
+		MimeType:  api.NewOptString("text/plain"),
+		ChannelId: api.NewOptInt64(910085),
+		Size:      api.NewOptInt64(100),
+	})
+	if err != nil {
+		t.Fatalf("FilesCreate failed: %v", err)
+	}
+
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
+		for _, rawRange := range []string{"bytes=0-1,1000-2000", "bytes=1000-2000,0-1"} {
+			req, err := http.NewRequestWithContext(ctx, method, s.server.URL+"/files/"+uuid.UUID(file.ID.Value).String()+"/content", nil)
+			if err != nil {
+				t.Fatalf("new %s request: %v", method, err)
+			}
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("Cookie", "access_token="+token)
+			req.Header.Set("Range", rawRange)
+
+			resp, err := s.httpCli.Do(req)
+			if err != nil {
+				t.Fatalf("%s request failed: %v", method, err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Fatalf("%s %q status = %d, want 400", method, rawRange, resp.StatusCode)
+			}
+		}
 	}
 }
 

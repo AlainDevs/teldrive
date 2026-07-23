@@ -174,7 +174,7 @@ func (s *rawService) SharesStream(ctx context.Context, params api.SharesStreamPa
 	if v, ok := params.Download.Get(); ok && v == api.SharesStreamDownload1 {
 		download = true
 	}
-	return s.streamLoadedFile(ctx, w, file, session, "", download)
+	return s.streamLoadedFile(ctx, w, file, session, params.Range.Or(""), download)
 }
 
 func (s *rawService) streamFile(ctx context.Context, w http.ResponseWriter, fileID uuid.UUID, session *jetmodel.Sessions, rawRange string, download bool) error {
@@ -222,6 +222,13 @@ func (s *rawService) authorizedSharedStreamFile(ctx context.Context, share *file
 }
 
 func (s *rawService) streamLoadedFile(ctx context.Context, w http.ResponseWriter, file *jetmodel.Files, session *jetmodel.Sessions, rawRange string, download bool) error {
+	if timeout := s.api.cnf.Server.WriteTimeout; timeout > 0 {
+		w = &streamResponseWriter{
+			ResponseWriter: w,
+			controller:     http.NewResponseController(w),
+			timeout:        timeout,
+		}
+	}
 	fileID := file.ID
 	logger := logging.Component("FILE").With(zap.String("file_id", fileID.String()), zap.Int64("user_id", session.UserID))
 	// Do not write headers yet. First check whether varc already has the
@@ -233,6 +240,10 @@ func (s *rawService) streamLoadedFile(ctx context.Context, w http.ResponseWriter
 		contentType = file.MimeType
 	}
 	if file.Size == nil || *file.Size == 0 {
+		if rawRange != "" {
+			w.Header().Set("Content-Range", "bytes */0")
+			return &apiError{err: http_range.ErrNoOverlap, code: http.StatusRequestedRangeNotSatisfiable}
+		}
 		w.Header().Set("Content-Type", contentType)
 		w.Header().Set("Content-Length", "0")
 		w.Header().Set("Content-Disposition", mime.FormatMediaType("inline", map[string]string{"filename": file.Name}))
@@ -245,6 +256,9 @@ func (s *rawService) streamLoadedFile(ctx context.Context, w http.ResponseWriter
 		start = 0
 		end = *file.Size - 1
 	} else {
+		if strings.Contains(rawRange, ",") {
+			return &apiError{err: fmt.Errorf("multiple ranges are not supported"), code: http.StatusBadRequest}
+		}
 		ranges, err := http_range.Parse(rawRange, *file.Size)
 		if err == http_range.ErrNoOverlap {
 			w.Header().Set("Content-Range", fmt.Sprintf("bytes */%d", *file.Size))
@@ -252,9 +266,6 @@ func (s *rawService) streamLoadedFile(ctx context.Context, w http.ResponseWriter
 		}
 		if err != nil {
 			return &apiError{err: err, code: http.StatusBadRequest}
-		}
-		if len(ranges) > 1 {
-			return &apiError{err: fmt.Errorf("multiple ranges are not supported"), code: http.StatusRequestedRangeNotSatisfiable}
 		}
 		start = ranges[0].Start
 		end = ranges[0].End
@@ -393,6 +404,36 @@ func (s *rawService) streamLoadedFile(ctx context.Context, w http.ResponseWriter
 		return err
 	}
 	return s.api.telegram.RunWithAuth(ctx, client, token, func(ctx context.Context) error { return handleStream() })
+}
+
+type streamResponseWriter struct {
+	http.ResponseWriter
+	controller *http.ResponseController
+	timeout    time.Duration
+}
+
+func (w *streamResponseWriter) WriteHeader(statusCode int) {
+	w.refreshWriteDeadline()
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *streamResponseWriter) Write(p []byte) (int, error) {
+	if err := w.refreshWriteDeadline(); err != nil {
+		return 0, err
+	}
+	return w.ResponseWriter.Write(p)
+}
+
+func (w *streamResponseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
+func (w *streamResponseWriter) refreshWriteDeadline() error {
+	err := w.controller.SetWriteDeadline(time.Now().Add(w.timeout))
+	if errors.Is(err, http.ErrNotSupported) {
+		return nil
+	}
+	return err
 }
 
 func (s *rawService) fetchParts(ctx context.Context, client TelegramClient, fileID string, channelID int64, fileParts []api.Part, encrypted bool) ([]types.Part, error) {

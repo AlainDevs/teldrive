@@ -287,6 +287,10 @@ export const useFileAction = (
 
 export const useShareFileAction = (params: ShareListParams) => {
   const actions = useModalStore((state) => state.actions);
+  const fileDialogOpen = useFileUploadStore(
+    (state) => state.actions.setFileDialogOpen,
+  );
+  const uploadOpen = useFileUploadStore((state) => state.actions.setUploadOpen);
   const navigate = useNavigate();
   return useCallback(() => async (data: MapFileActionsToData<FbActionFullUnion>) => {
       switch (data.id) {
@@ -356,6 +360,21 @@ export const useShareFileAction = (params: ShareListParams) => {
           break;
         }
 
+        case FbActions.CreateFolder.id: {
+          actions.set({
+            currentFile: {} as FileData,
+            open: true,
+            operation: FbActions.CreateFolder.id,
+          });
+          break;
+        }
+
+        case FbActions.UploadFiles.id: {
+          fileDialogOpen(true);
+          uploadOpen(true);
+          break;
+        }
+
         case FbActions.EnableListView.id:
         case FbActions.EnableGridView.id: {
           localStorage.setItem("viewId", data.id);
@@ -364,7 +383,7 @@ export const useShareFileAction = (params: ShareListParams) => {
         default:
           break;
       }
-    }, [params.path, params.id]);
+    }, [params.path, params.id, actions, fileDialogOpen, uploadOpen]);
 };
 
 export const fileActions = Object.keys(CustomActions).map(

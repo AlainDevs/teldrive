@@ -203,6 +203,107 @@ func TestShareUpdatePassword(t *testing.T) {
 	}
 }
 
+func TestShareAllowUploadPersistenceAndUpdate(t *testing.T) {
+	s := newHarness(t)
+	ctx := context.Background()
+	uid := int64(3005)
+	s.ensureUserExists(uid)
+
+	active := "active"
+	now := time.Now().UTC()
+	folderID := uuid.New()
+	folder := &jetmodel.Files{
+		ID:        folderID,
+		Name:      "allow-upload-folder",
+		Type:      "folder",
+		MimeType:  "drive/folder",
+		UserID:    uid,
+		Status:    &active,
+		Encrypted: false,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := s.repos.Files.Create(ctx, folder); err != nil {
+		t.Fatalf("create folder: %v", err)
+	}
+
+	defaultShareID := uuid.New()
+	if err := s.repos.Shares.Create(ctx, &jetmodel.FileShares{
+		ID:        defaultShareID,
+		FileID:    folderID,
+		UserID:    uid,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("create default share: %v", err)
+	}
+	defaultShare, err := s.repos.Shares.GetByID(ctx, defaultShareID)
+	if err != nil {
+		t.Fatalf("get default share: %v", err)
+	}
+	if defaultShare.AllowUpload {
+		t.Fatalf("expected default allowUpload false")
+	}
+
+	allowedShareID := uuid.New()
+	if err := s.repos.Shares.Create(ctx, &jetmodel.FileShares{
+		ID:          allowedShareID,
+		FileID:      folderID,
+		UserID:      uid,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+		AllowUpload: true,
+	}); err != nil {
+		t.Fatalf("create allowed share: %v", err)
+	}
+	allowedShare, err := s.repos.Shares.GetByID(ctx, allowedShareID)
+	if err != nil {
+		t.Fatalf("get allowed share: %v", err)
+	}
+	if !allowedShare.AllowUpload {
+		t.Fatalf("expected allowUpload true after create")
+	}
+
+	shares, err := s.repos.Shares.GetByFileID(ctx, folderID)
+	if err != nil {
+		t.Fatalf("get shares by file id: %v", err)
+	}
+	allowByID := make(map[uuid.UUID]bool, len(shares))
+	for _, share := range shares {
+		allowByID[share.ID] = share.AllowUpload
+	}
+	if allowByID[defaultShareID] {
+		t.Fatalf("expected listed default share allowUpload false")
+	}
+	if !allowByID[allowedShareID] {
+		t.Fatalf("expected listed allowed share allowUpload true")
+	}
+
+	allow := true
+	if err := s.repos.Shares.Update(ctx, defaultShareID, repositories.ShareUpdate{AllowUpload: &allow}); err != nil {
+		t.Fatalf("update default share allowUpload true: %v", err)
+	}
+	defaultShare, err = s.repos.Shares.GetByID(ctx, defaultShareID)
+	if err != nil {
+		t.Fatalf("get default share after enable: %v", err)
+	}
+	if !defaultShare.AllowUpload {
+		t.Fatalf("expected allowUpload true after update")
+	}
+
+	allow = false
+	if err := s.repos.Shares.Update(ctx, allowedShareID, repositories.ShareUpdate{AllowUpload: &allow}); err != nil {
+		t.Fatalf("update allowed share allowUpload false: %v", err)
+	}
+	allowedShare, err = s.repos.Shares.GetByID(ctx, allowedShareID)
+	if err != nil {
+		t.Fatalf("get allowed share after disable: %v", err)
+	}
+	if allowedShare.AllowUpload {
+		t.Fatalf("expected allowUpload false after update")
+	}
+}
+
 func TestShareDelete(t *testing.T) {
 	s := newHarness(t)
 	ctx := context.Background()

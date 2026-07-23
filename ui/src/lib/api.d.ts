@@ -471,7 +471,8 @@ export interface paths {
         /** List files in share */
         get: operations["Shares_listFiles"];
         put?: never;
-        post?: never;
+        /** Create file or folder in share */
+        post: operations["Shares_createFile"];
         delete?: never;
         options?: never;
         head?: never;
@@ -506,6 +507,23 @@ export interface paths {
         put?: never;
         /** Unlock share */
         post: operations["Shares_unlock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shares/{id}/uploads/{uploadId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload file part to share */
+        post: operations["Shares_upload"];
         delete?: never;
         options?: never;
         head?: never;
@@ -668,7 +686,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update user config */
+        patch: operations["Users_updateConfig"];
         trace?: never;
     };
     "/users/profile": {
@@ -876,13 +895,29 @@ export interface components {
              */
             code: number;
             /**
+             * @description Stable machine-readable error code
+             * @example internal_error
+             */
+            error?: string;
+            /**
              * @description Error message
              * @example Internal server error occurred
              */
             message: string;
+            /**
+             * @description Request identifier for support and log correlation
+             * @example 0193b6a4-7b6e-7bf0-a119-78efc4c2bd58
+             */
+            requestId?: string;
         };
         /** @description Event information */
         Event: {
+            /**
+             * Format: int64
+             * @description Event stream sequence
+             * @example 123
+             */
+            seq: number;
             /**
              * @description Event ID
              * @example 123e4567-e89b-12d3-a456-426614174000
@@ -902,7 +937,7 @@ export interface components {
          * @description Event information
          * @enum {string}
          */
-        EventType: "files.created" | "files.updated" | "files.deleted" | "files.moved" | "files.copied" | "uploads.progress" | "jobs.progress";
+        EventType: "files.created" | "files.updated" | "files.deleted" | "files.moved" | "files.copied" | "uploads.progress";
         /** @description File metadata */
         File: {
             /**
@@ -1026,6 +1061,8 @@ export interface components {
              * @description Expiration date and time of the share link
              */
             expiresAt?: string;
+            /** @description Whether recipients can upload files and create folders */
+            allowUpload: boolean;
         };
         /** @description File share creation request */
         FileShareCreate: {
@@ -1039,6 +1076,8 @@ export interface components {
              * @description Share expiration date
              */
             expiresAt?: string;
+            /** @description Allow recipients to upload files and create folders */
+            allowUpload?: boolean;
         };
         FileShareInfo: {
             /**
@@ -1067,6 +1106,10 @@ export interface components {
              * @example false
              */
             protected: boolean;
+            /** @description Whether recipients can upload files and create folders */
+            allowUpload: boolean;
+            /** @description Whether uploads to this share are encrypted by owner policy */
+            encryptUploads: boolean;
         };
         /** @description File update request */
         FileUpdate: {
@@ -1367,13 +1410,14 @@ export interface components {
             key: string;
         };
         /**
-         * @description User configuration for channel and bot settings
+         * @description User configuration for channel, bot, and upload policy settings
          * @example {
          *       "channelId": 123456789,
          *       "bots": [
          *         "bot1",
          *         "bot2"
-         *       ]
+         *       ],
+         *       "encryptFiles": false
          *     }
          */
         UserConfig: {
@@ -1384,6 +1428,13 @@ export interface components {
             channelId: number;
             /** @description List of bot tokens */
             bots: string[];
+            /** @description Whether files uploaded through writable shares are encrypted */
+            encryptFiles: boolean;
+        };
+        /** @description User configuration update */
+        UserConfigUpdate: {
+            /** @description Whether files uploaded through writable shares are encrypted */
+            encryptFiles?: boolean;
         };
         /**
          * @description User session information
@@ -1443,6 +1494,8 @@ export interface components {
         "FileQuery.path": string;
         /** @description Search query */
         "FileQuery.query": string;
+        /** @description Get root-level files/folders (parentId IS NULL) */
+        "FileQuery.root": boolean;
         /** @description Search type */
         "FileQuery.searchType": "text" | "regex";
         /** @description Show shared files */
@@ -1467,6 +1520,14 @@ export interface components {
         "ShareQuery.path": string;
         /** @description Sort field */
         "ShareQuery.sort": "name" | "updatedAt" | "size" | "id";
+        /** @description Whether the upload content is encrypted */
+        "ShareUploadQuery.encrypted": boolean;
+        /** @description Original file name */
+        "ShareUploadQuery.fileName": string;
+        /** @description Enable BLAKE3 hashing for integrity checking */
+        "ShareUploadQuery.hashing": boolean;
+        /** @description Sequential part number */
+        "ShareUploadQuery.partNo": number;
         /** @description Optional channel identifier for upload */
         "UploadQuery.channelId": number;
         /** @description Whether the upload content is encrypted */
@@ -1835,12 +1896,15 @@ export interface operations {
     Events_eventsStream: {
         parameters: {
             query?: {
-                /** @description Event types filter. Supports repeated query params and comma-separated values. Wildcards supported: files.*, uploads.*, jobs.* */
+                /** @description Event types filter. Supports repeated query params and comma-separated values. Wildcards supported: files.*, uploads.* */
                 types?: string[];
                 /** @description Heartbeat interval in milliseconds (default: 30000) */
                 interval?: number;
             };
-            header?: never;
+            header?: {
+                /** @description Last received event sequence. Sent automatically by SSE clients as Last-Event-ID during reconnect. */
+                "Last-Event-Id"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1891,6 +1955,8 @@ export interface operations {
                 shared?: components["parameters"]["FileQuery.shared"];
                 /** @description Parent folder ID */
                 parentId?: components["parameters"]["FileQuery.parentId"];
+                /** @description Get root-level files/folders (parentId IS NULL) */
+                root?: components["parameters"]["FileQuery.root"];
                 /** @description File category */
                 category?: components["parameters"]["FileQuery.category"];
                 /** @description UpdatedAt Filter supports operator eq, gt, lt, gte, lte */
@@ -2268,6 +2334,15 @@ export interface operations {
                     Etag: string;
                     /** @description Last modification timestamp */
                     "Last-Modified": string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unsatisfiable byte range response */
+            416: {
+                headers: {
+                    /** @description Current file size for an unsatisfiable range */
+                    "Content-Range": string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -2736,12 +2811,51 @@ export interface operations {
             };
         };
     };
+    Shares_createFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["UUID"];
+            };
+            cookie?: {
+                share_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["File"];
+            };
+        };
+        responses: {
+            /** @description The request has succeeded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["File"];
+                };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     Shares_stream: {
         parameters: {
             query?: {
                 download?: "0" | "1";
             };
-            header?: never;
+            header?: {
+                Range?: string;
+            };
             path: {
                 id: components["schemas"]["UUID"];
                 fileId: components["schemas"]["UUID"];
@@ -2827,6 +2941,55 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    Shares_upload: {
+        parameters: {
+            query: {
+                /** @description Original file name */
+                fileName: components["parameters"]["ShareUploadQuery.fileName"];
+                /** @description Sequential part number */
+                partNo: components["parameters"]["ShareUploadQuery.partNo"];
+                /** @description Whether the upload content is encrypted */
+                encrypted?: components["parameters"]["ShareUploadQuery.encrypted"];
+                /** @description Enable BLAKE3 hashing for integrity checking */
+                hashing?: components["parameters"]["ShareUploadQuery.hashing"];
+            };
+            header: {
+                "Content-Length": number;
+            };
+            path: {
+                id: components["schemas"]["UUID"];
+                uploadId: string;
+            };
+            cookie?: {
+                share_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "*/*": string;
+            };
+        };
+        responses: {
+            /** @description The request has succeeded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadPart"];
+                };
             };
             /** @description An unexpected error response. */
             default: {
@@ -3291,6 +3454,37 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["UserConfig"];
                 };
+            };
+            /** @description An unexpected error response. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    Users_updateConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description There is no content to send for this request, but the headers may be useful. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description An unexpected error response. */
             default: {

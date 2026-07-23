@@ -37,6 +37,39 @@ func TestUsersRoutes_BasicEndpoints(t *testing.T) {
 	}
 }
 
+func TestUsersConfig_EncryptFilesRoundTrip(t *testing.T) {
+	s := newHarness(t)
+	ctx := context.Background()
+	_, client, _ := loginWithClient(t, s, 8520, "user8520")
+
+	config, err := client.UsersStats(ctx)
+	if err != nil {
+		t.Fatalf("UsersStats failed: %v", err)
+	}
+	if config.EncryptFiles {
+		t.Fatalf("expected default encryptFiles=false")
+	}
+
+	if err := client.UsersUpdateConfig(ctx, &api.UserConfigUpdate{EncryptFiles: api.NewOptBool(true)}); err != nil {
+		t.Fatalf("UsersUpdateConfig failed: %v", err)
+	}
+	config, err = client.UsersStats(ctx)
+	if err != nil {
+		t.Fatalf("UsersStats after update failed: %v", err)
+	}
+	if !config.EncryptFiles {
+		t.Fatalf("expected encryptFiles=true after PATCH")
+	}
+
+	user, err := s.repos.Users.GetByID(ctx, 8520)
+	if err != nil {
+		t.Fatalf("GetByID failed: %v", err)
+	}
+	if !user.EncryptFiles {
+		t.Fatalf("expected users.encrypt_files persisted true")
+	}
+}
+
 func TestUsersRoutes_ValidationAndRollback(t *testing.T) {
 	s := newHarness(t)
 	ctx := context.Background()

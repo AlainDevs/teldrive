@@ -1,11 +1,15 @@
-import { memo, useCallback } from "react";
+import { memo, useCallback, useEffect } from "react";
 import { scrollbarClasses } from "@/utils/classes";
 import clsx from "clsx";
 import { Button } from "@heroui/react";
+import { useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 
 import { categoryConfig, generalSettingsConfig } from "@/config/settings";
 import { SettingsField } from "./settings-field";
 import { useSettingsStore } from "@/utils/stores/settings";
+import { $api } from "@/utils/api";
+import type { SettingValue } from "@/config/settings";
 
 import IcBaselineCloudUpload from "~icons/ic/baseline-cloud-upload";
 import IcBaselineSettings from "~icons/ic/baseline-settings";
@@ -21,18 +25,43 @@ const iconMap: Record<string, React.ElementType> = {
 export const GeneralTab = memo(() => {
   const { settings, updateSetting, resetSettings } = useSettingsStore();
 
+  const queryClient = useQueryClient();
+
+  const { data: userConfig } = $api.useSuspenseQuery("get", "/users/config");
+
+  const updateUserConfig = $api.useMutation("patch", "/users/config", {
+    onError: () => {
+      toast.error("Failed to update encryption setting");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: $api.queryOptions("get", "/users/config").queryKey });
+    },
+  });
+
+  useEffect(() => {
+    updateSetting("encryptFiles", userConfig.encryptFiles);
+  }, [updateSetting, userConfig.encryptFiles]);
+
   const categories = ["upload", "display", "other"] as const;
 
   const handleFieldChange = useCallback(
-    (key: keyof typeof settings, value: any) => {
-      if (value instanceof HTMLElement || value instanceof Event) {
-        console.error("Invalid value type for setting:", key, value);
-        return;
+    async (key: keyof typeof settings, value: SettingValue) => {
+      if (key === "encryptFiles") {
+        await updateUserConfig.mutateAsync({ body: { encryptFiles: Boolean(value) } });
       }
       updateSetting(key, value);
     },
-    [updateSetting],
+    [updateSetting, updateUserConfig],
   );
+
+  const handleResetSettings = useCallback(async () => {
+    try {
+      await updateUserConfig.mutateAsync({ body: { encryptFiles: false } });
+      resetSettings();
+    } catch (error) {
+      console.error("Failed to reset encryption setting", error);
+    }
+  }, [resetSettings, updateUserConfig]);
 
   return (
     <div className={clsx("flex flex-col gap-6 p-4 h-full overflow-y-auto", scrollbarClasses)}>
@@ -62,7 +91,7 @@ export const GeneralTab = memo(() => {
                 <SettingsField
                   key={field.key}
                   config={field}
-                  value={settings[field.key]}
+                  value={settings[field.key] ?? field.defaultValue ?? ""}
                   onChange={(value) => handleFieldChange(field.key, value)}
                 />
               ))}
@@ -74,7 +103,8 @@ export const GeneralTab = memo(() => {
         <Button
           variant="secondary"
           className="px-8 py-6 rounded-2xl font-semibold"
-          onPress={resetSettings}
+          isDisabled={updateUserConfig.isPending}
+          onPress={handleResetSettings}
         >
           Reset All Settings
         </Button>

@@ -517,6 +517,36 @@ func (r *JetFileRepository) DeletePendingFoldersByUser(ctx context.Context, user
 	return r.db.exec(ctx, stmt)
 }
 
+func (r *JetFileRepository) IncrementActiveAncestorFolderSizes(ctx context.Context, userID int64, parentID uuid.UUID, delta int64) error {
+	query := `
+WITH RECURSIVE ancestors AS (
+	SELECT f.id, f.parent_id, ARRAY[f.id]::uuid[] AS path
+	FROM files f
+	WHERE f.id = $2 AND f.user_id = $1 AND f.type = 'folder' AND f.status = 'active'
+
+	UNION ALL
+
+	SELECT f.id, f.parent_id, a.path || f.id
+	FROM files f
+	JOIN ancestors a ON f.id = a.parent_id
+	WHERE f.user_id = $1
+		AND f.type = 'folder'
+		AND f.status = 'active'
+		AND NOT (f.id = ANY(a.path))
+)
+UPDATE files f
+SET size = COALESCE(f.size, 0) + $3,
+	updated_at = $4
+FROM ancestors a
+WHERE f.id = a.id
+	AND f.user_id = $1
+	AND f.type = 'folder'
+	AND f.status = 'active';`
+
+	_, err := r.db.executor(ctx).Exec(ctx, query, userID, parentID, delta, time.Now().UTC())
+	return normalizeDBError(err)
+}
+
 func (r *JetFileRepository) RefreshFolderSizesByUser(ctx context.Context, userID int64) error {
 	query := `
 WITH RECURSIVE folder_hierarchy AS (

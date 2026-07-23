@@ -1,13 +1,13 @@
 import { memo, useCallback, useEffect, useState } from "react";
 import { FieldError, InputGroup, ListBox, Select, Switch, TextField } from "@heroui/react";
 import clsx from "clsx";
-import type { SettingFieldConfig } from "@/config/settings";
+import type { SettingFieldConfig, SettingValue } from "@/config/settings";
 import { debounce } from "@/utils/debounce";
 
-interface SettingsFieldProps<T> {
-  config: SettingFieldConfig<T>;
-  value: T;
-  onChange: (value: T) => void;
+interface SettingsFieldProps {
+  config: SettingFieldConfig<SettingValue>;
+  value: SettingValue;
+  onChange: (value: SettingValue) => void | Promise<void>;
   disabled?: boolean;
 }
 
@@ -22,22 +22,22 @@ function validateUrl(value: string): boolean {
 }
 
 export const SettingsField = memo(
-  <T,>({ config, value, onChange, disabled }: SettingsFieldProps<T>) => {
+  ({ config, value, onChange, disabled }: SettingsFieldProps) => {
     const [error, setError] = useState("");
-    const [localValue, setLocalValue] = useState<T>(value);
+    const [localValue, setLocalValue] = useState<SettingValue>(value);
 
     useEffect(() => {
       setLocalValue(value);
     }, [value]);
 
     const debouncedValidate = useCallback(
-      debounce((newValue: T) => {
+      debounce((newValue: SettingValue) => {
         validateAndSave(newValue);
       }, 1000),
       [config],
     );
 
-    const validateAndSave = (newValue: T) => {
+    const validateAndSave = async (newValue: SettingValue) => {
       let errorMessage = "";
 
       if (config.type === "url" && typeof newValue === "string") {
@@ -49,7 +49,7 @@ export const SettingsField = memo(
           errorMessage = "Invalid format";
         }
       } else if (config.validation?.custom && newValue) {
-        const result = config.validation.custom(newValue as any);
+        const result = config.validation.custom(newValue);
         if (result !== true) {
           errorMessage = result;
         }
@@ -58,11 +58,15 @@ export const SettingsField = memo(
       setError(errorMessage);
 
       if (!errorMessage) {
-        onChange(newValue);
+        try {
+          await onChange(newValue);
+        } catch {
+          setLocalValue(value);
+        }
       }
     };
 
-    const handleFieldChange = (newValue: T) => {
+    const handleFieldChange = (newValue: SettingValue) => {
       setLocalValue(newValue);
       debouncedValidate(newValue);
     };
@@ -75,8 +79,8 @@ export const SettingsField = memo(
           return (
             <TextField
               aria-label={config.label}
-              value={localValue as string}
-              onChange={(v) => handleFieldChange(v as T)}
+              value={String(localValue)}
+              onChange={handleFieldChange}
               isInvalid={Boolean(error)}
               isDisabled={disabled}
             >
@@ -95,7 +99,7 @@ export const SettingsField = memo(
             <TextField
               aria-label={config.label}
               value={localValue != null ? String(localValue) : ""}
-              onChange={(v) => handleFieldChange(Number(v) as T)}
+              onChange={(v) => handleFieldChange(Number(v))}
               isInvalid={Boolean(error)}
               isDisabled={disabled}
             >
@@ -117,7 +121,7 @@ export const SettingsField = memo(
                     (opt) => String(opt.value) === key,
                   );
                   if (option) {
-                    handleFieldChange(option.value as T);
+                    handleFieldChange(option.value);
                   }
                 }
               }}
@@ -129,7 +133,7 @@ export const SettingsField = memo(
               </Select.Trigger>
               <Select.Popover>
                 <ListBox className="rounded-xl">
-                  {(config.options || []).map((item: any) => (
+                  {(config.options || []).map((item) => (
                     <ListBox.Item
                       key={String(item.value)}
                       id={String(item.value)}
@@ -149,7 +153,7 @@ export const SettingsField = memo(
           return (
             <Switch
               size="lg"
-              onChange={(isSelected) => handleFieldChange(isSelected as T)}
+              onChange={handleFieldChange}
               isSelected={localValue as boolean}
               name={config.key}
               isDisabled={disabled}

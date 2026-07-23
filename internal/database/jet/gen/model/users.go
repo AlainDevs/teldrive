@@ -12,10 +12,11 @@ import (
 )
 
 type Users struct {
-	UserID    int64 `sql:"primary_key"`
-	Name      *string
-	UserName  string
-	IsPremium bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	UserID       int64 `sql:"primary_key"`
+	Name         *string
+	UserName     string
+	IsPremium    bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	EncryptFiles bool
 }

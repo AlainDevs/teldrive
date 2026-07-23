@@ -48,6 +48,24 @@ func (r *JetUploadRepository) GetByUploadID(ctx context.Context, uploadID string
 	return out, nil
 }
 
+func (r *JetUploadRepository) GetByUploadIDAndUserID(ctx context.Context, uploadID string, userID int64) ([]model.Uploads, error) {
+	stmt := table.Uploads.
+		SELECT(table.Uploads.AllColumns).
+		FROM(table.Uploads).
+		WHERE(
+			table.Uploads.UploadID.EQ(postgres.String(uploadID)).
+				AND(table.Uploads.UserID.EQ(postgres.Int64(userID))),
+		).
+		ORDER_BY(table.Uploads.PartNo.ASC())
+
+	var out []model.Uploads
+	if err := r.db.query(ctx, stmt, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 func (r *JetUploadRepository) GetByUploadIDAndRetention(ctx context.Context, uploadID string, retention time.Duration) ([]model.Uploads, error) {
 	threshold := time.Now().UTC().Add(-retention)
 	stmt := table.Uploads.
@@ -67,11 +85,93 @@ func (r *JetUploadRepository) GetByUploadIDAndRetention(ctx context.Context, upl
 	return out, nil
 }
 
+func (r *JetUploadRepository) GetByUploadIDUserIDAndRetention(ctx context.Context, uploadID string, userID int64, retention time.Duration) ([]model.Uploads, error) {
+	threshold := time.Now().UTC().Add(-retention)
+	stmt := table.Uploads.
+		SELECT(table.Uploads.AllColumns).
+		FROM(table.Uploads).
+		WHERE(
+			table.Uploads.UploadID.EQ(postgres.String(uploadID)).
+				AND(table.Uploads.UserID.EQ(postgres.Int64(userID))).
+				AND(table.Uploads.CreatedAt.GT(postgres.TimestampT(threshold))),
+		).
+		ORDER_BY(table.Uploads.PartNo.ASC())
+
+	var out []model.Uploads
+	if err := r.db.query(ctx, stmt, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func (r *JetUploadRepository) ConsumeByUploadIDAndUserID(ctx context.Context, uploadID string, userID int64) ([]model.Uploads, error) {
+	rows, err := r.db.executor(ctx).Query(ctx, `
+		WITH locked AS (
+			SELECT upload_id, part_id, channel_id
+			FROM uploads
+			WHERE upload_id = $1 AND user_id = $2
+			ORDER BY part_no
+			FOR UPDATE
+		), deleted AS (
+			DELETE FROM uploads u
+			USING locked l
+			WHERE u.upload_id = l.upload_id
+				AND u.part_id = l.part_id
+				AND u.channel_id = l.channel_id
+			RETURNING u.upload_id, u.name, u.user_id, u.part_no, u.part_id, u.channel_id,
+				u.size, u.encrypted, u.salt, u.block_hashes, u.created_at
+		)
+		SELECT upload_id, name, user_id, part_no, part_id, channel_id,
+			size, encrypted, salt, block_hashes, created_at
+		FROM deleted
+		ORDER BY part_no
+	`, uploadID, userID)
+	if err != nil {
+		return nil, normalizeDBError(err)
+	}
+	defer rows.Close()
+
+	out := []model.Uploads{}
+	for rows.Next() {
+		var upload model.Uploads
+		if err := rows.Scan(
+			&upload.UploadID,
+			&upload.Name,
+			&upload.UserID,
+			&upload.PartNo,
+			&upload.PartID,
+			&upload.ChannelID,
+			&upload.Size,
+			&upload.Encrypted,
+			&upload.Salt,
+			&upload.BlockHashes,
+			&upload.CreatedAt,
+		); err != nil {
+			return nil, normalizeDBError(err)
+		}
+		out = append(out, upload)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, normalizeDBError(err)
+	}
+
+	return out, nil
+}
+
 func (r *JetUploadRepository) Delete(ctx context.Context, uploadID string) error {
 	stmt := table.Uploads.DELETE().WHERE(table.Uploads.UploadID.EQ(postgres.String(uploadID)))
 	err := r.db.exec(ctx, stmt)
 
 	return err
+}
+
+func (r *JetUploadRepository) DeleteByUploadIDAndUserID(ctx context.Context, uploadID string, userID int64) error {
+	stmt := table.Uploads.DELETE().WHERE(
+		table.Uploads.UploadID.EQ(postgres.String(uploadID)).
+			AND(table.Uploads.UserID.EQ(postgres.Int64(userID))),
+	)
+	return r.db.exec(ctx, stmt)
 }
 
 func (r *JetUploadRepository) ListStale(ctx context.Context, before time.Time) ([]StaleUpload, error) {

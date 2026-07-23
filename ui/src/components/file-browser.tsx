@@ -60,6 +60,8 @@ export const DriveFileBrowser = memo(() => {
 
   const openUpload = useFileUploadStore((state) => state.uploadOpen);
 
+  const currentPath = search?.path || "/";
+
   const { breakpoint } = useBreakpoint(BREAKPOINTS);
 
   const { data: files } = useSuspenseInfiniteQuery(queryOptions);
@@ -109,7 +111,7 @@ export const DriveFileBrowser = memo(() => {
       </UploadDropzone>
 
       {modalFileActions.find((val) => val === modalOperation) && modalOpen && (
-        <FileOperationModal queryKey={queryOptions.queryKey} />
+        <FileOperationModal queryKey={queryOptions.queryKey} path={currentPath} />
       )}
 
       {modalOperation === FbActions.OpenFiles.id && modalOpen && (
@@ -120,7 +122,7 @@ export const DriveFileBrowser = memo(() => {
           view={view as BrowseView}
         />
       )}
-      {openUpload && <Upload queryKey={queryOptions.queryKey} />}
+      {openUpload && <Upload queryKey={queryOptions.queryKey} path={currentPath} userId={session?.userId} />}
     </div>
   );
 });

@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -27,14 +28,14 @@ var (
 )
 
 func (a *apiService) UploadsDelete(ctx context.Context, params api.UploadsDeleteParams) error {
-	if err := a.repo.Uploads.Delete(ctx, params.ID); err != nil {
+	if err := a.repo.Uploads.DeleteByUploadIDAndUserID(ctx, params.ID, auth.User(ctx)); err != nil {
 		return &apiError{err: err}
 	}
 	return nil
 }
 
 func (a *apiService) UploadsPartsById(ctx context.Context, params api.UploadsPartsByIdParams) ([]api.UploadPart, error) {
-	parts, err := a.repo.Uploads.GetByUploadIDAndRetention(ctx, params.ID, a.cnf.TG.Uploads.Retention)
+	parts, err := a.repo.Uploads.GetByUploadIDUserIDAndRetention(ctx, params.ID, auth.User(ctx), a.cnf.TG.Uploads.Retention)
 	if err != nil {
 		return nil, &apiError{err: err}
 	}
@@ -80,7 +81,15 @@ func (a *apiService) getUploadClient(ctx context.Context, userId int64) (Telegra
 	}
 
 	if len(tokens) == 0 {
-		client, err := a.telegram.AuthClient(ctx, auth.JWTUser(ctx).TgSession, a.cnf.TG.Uploads.MaxRetries)
+		sessionByUser, err := latestSessionsByUsers(ctx, a, []int64{userId})
+		if err != nil {
+			return nil, "", 0, "", err
+		}
+		session := sessionByUser[userId]
+		if session == "" {
+			return nil, "", 0, "", fmt.Errorf("no active Telegram session for user %d", userId)
+		}
+		client, err := a.telegram.AuthClient(ctx, session, a.cnf.TG.Uploads.MaxRetries)
 		if err != nil {
 			return nil, "", 0, "", err
 		}

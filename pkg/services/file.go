@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"mime"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -15,17 +16,20 @@ import (
 	"github.com/tgdrive/teldrive/internal/auth"
 	"github.com/tgdrive/teldrive/internal/cache"
 	"github.com/tgdrive/teldrive/internal/category"
+	"github.com/tgdrive/teldrive/internal/crypt"
 	jetmodel "github.com/tgdrive/teldrive/internal/database/jet/gen/model"
 	"github.com/tgdrive/teldrive/internal/database/types"
 	"github.com/tgdrive/teldrive/internal/events"
 	"github.com/tgdrive/teldrive/internal/hash"
 	"github.com/tgdrive/teldrive/internal/http_range"
+	"github.com/tgdrive/teldrive/internal/logging"
 	"github.com/tgdrive/teldrive/internal/md5"
 	"github.com/tgdrive/teldrive/internal/utils"
 	"github.com/tgdrive/teldrive/pkg/constants"
 	"github.com/tgdrive/teldrive/pkg/dto"
 	"github.com/tgdrive/teldrive/pkg/mapper"
 	"github.com/tgdrive/teldrive/pkg/repositories"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -34,9 +38,18 @@ var (
 	defaultContentType   = "application/octet-stream"
 )
 
+const (
+	shareUploadMaxPartSize = int64(500 * 1024 * 1024)
+	shareUploadMaxPartNo   = 4000
+)
+
 func isUUID(str string) bool {
 	_, err := uuid.Parse(str)
 	return err == nil
+}
+
+func namespacedShareUploadID(shareID uuid.UUID, clientUploadID string) string {
+	return "share:" + shareID.String() + ":" + clientUploadID
 }
 
 func uploadTreeHash(uploads []jetmodel.Uploads) *string {
@@ -254,11 +267,14 @@ func (a *apiService) prepareFileData(ctx context.Context, fileIn *api.File, file
 		parts = fileIn.Parts
 	} else if fileIn.UploadId.Value != "" {
 		uploadId = fileIn.UploadId.Value
-		fetchedUploads, err := a.repo.Uploads.GetByUploadID(ctx, uploadId)
+		fetchedUploads, err := a.repo.Uploads.GetByUploadIDAndUserID(ctx, uploadId, userId)
 		if err != nil {
 			return "", nil, err
 		}
 		uploads = fetchedUploads
+		if len(uploads) == 0 {
+			return "", nil, repositories.ErrNotFound
+		}
 		for _, upload := range uploads {
 			if upload.PartID == 0 {
 				return "", nil, errors.New("invalid part: part_id cannot be zero")
@@ -300,7 +316,7 @@ func (a *apiService) persistAndCleanup(ctx context.Context, fileDB jetmodel.File
 			return err
 		}
 		if uploadId != "" {
-			if err := a.repo.Uploads.Delete(txCtx, uploadId); err != nil {
+			if err := a.repo.Uploads.DeleteByUploadIDAndUserID(txCtx, uploadId, userId); err != nil {
 				return err
 			}
 		}
@@ -333,6 +349,17 @@ func (a *apiService) persistAndCleanup(ctx context.Context, fileDB jetmodel.File
 
 func (a *apiService) FilesCreateShare(ctx context.Context, req *api.FileShareCreate, params api.FilesCreateShareParams) error {
 	userId := auth.User(ctx)
+	allowUpload := req.AllowUpload.Or(false)
+	file, err := a.repo.Files.GetByIDAndUser(ctx, uuid.UUID(params.ID), userId)
+	if err != nil {
+		if errors.Is(err, repositories.ErrNotFound) {
+			return &apiError{err: fileNotFound(uuid.UUID(params.ID), err)}
+		}
+		return &apiError{err: err}
+	}
+	if allowUpload && file.Type != string(api.FileTypeFolder) {
+		return &apiError{err: errors.New("uploads are only allowed for folder shares"), code: http.StatusForbidden}
+	}
 
 	var fileShare jetmodel.FileShares
 
@@ -350,6 +377,7 @@ func (a *apiService) FilesCreateShare(ctx context.Context, req *api.FileShareCre
 		fileShare.ExpiresAt = utils.Ptr(req.ExpiresAt.Value)
 	}
 	fileShare.UserID = userId
+	fileShare.AllowUpload = allowUpload
 
 	if err := a.repo.Shares.Create(ctx, &fileShare); err != nil {
 		return &apiError{err: err}
@@ -447,14 +475,47 @@ func (a *apiService) FilesDelete(ctx context.Context, req *api.FileDelete) error
 }
 
 func (a *apiService) FilesDeleteShare(ctx context.Context, params api.FilesDeleteShareParams) error {
-	if err := a.repo.Shares.Delete(ctx, uuid.UUID(params.ShareId)); err != nil {
+	userID := auth.User(ctx)
+	shareID := uuid.UUID(params.ShareId)
+	fileID := uuid.UUID(params.ID)
+	share, err := a.repo.Shares.GetByID(ctx, shareID)
+	if err != nil {
+		if errors.Is(err, repositories.ErrNotFound) {
+			return &apiError{err: shareNotFound(shareID, err)}
+		}
 		return &apiError{err: err}
 	}
-	a.cache.Delete(ctx, cache.KeyShare(uuid.UUID(params.ShareId).String()))
+	if share.FileID != fileID {
+		return &apiError{err: shareNotFound(shareID, repositories.ErrNotFound)}
+	}
+	if share.UserID != userID {
+		return &apiError{err: errors.New("share does not belong to user"), code: http.StatusForbidden}
+	}
+	if err := a.repo.Shares.Delete(ctx, shareID); err != nil {
+		return &apiError{err: err}
+	}
+	a.cache.Delete(ctx, cache.KeyShare(shareID.String()))
 	return nil
 }
 
 func (a *apiService) FilesEditShare(ctx context.Context, req *api.FileShareCreate, params api.FilesEditShareParams) error {
+	userID := auth.User(ctx)
+	shareID := uuid.UUID(params.ShareId)
+	fileID := uuid.UUID(params.ID)
+	share, err := a.repo.Shares.GetByID(ctx, shareID)
+	if err != nil {
+		if errors.Is(err, repositories.ErrNotFound) {
+			return &apiError{err: shareNotFound(shareID, err)}
+		}
+		return &apiError{err: err}
+	}
+	if share.FileID != fileID {
+		return &apiError{err: shareNotFound(shareID, repositories.ErrNotFound)}
+	}
+	if share.UserID != userID {
+		return &apiError{err: errors.New("share does not belong to user"), code: http.StatusForbidden}
+	}
+
 	update := repositories.ShareUpdate{}
 
 	if req.Password.Value != "" {
@@ -467,12 +528,392 @@ func (a *apiService) FilesEditShare(ctx context.Context, req *api.FileShareCreat
 	if req.ExpiresAt.IsSet() {
 		update.ExpiresAt = utils.Ptr(req.ExpiresAt.Value)
 	}
-
-	if err := a.repo.Shares.Update(ctx, uuid.UUID(params.ID), update); err != nil {
-		return &apiError{err: err}
+	allowUpload := req.AllowUpload.Or(false)
+	if req.AllowUpload.IsSet() {
+		update.AllowUpload = &allowUpload
+	}
+	if allowUpload {
+		file, err := a.repo.Files.GetByIDAndUser(ctx, share.FileID, userID)
+		if err != nil {
+			if errors.Is(err, repositories.ErrNotFound) {
+				return &apiError{err: fileNotFound(share.FileID, err)}
+			}
+			return &apiError{err: err}
+		}
+		if file.Type != string(api.FileTypeFolder) {
+			return &apiError{err: errors.New("uploads are only allowed for folder shares"), code: http.StatusForbidden}
+		}
 	}
 
+	if err := a.repo.Shares.Update(ctx, shareID, update); err != nil {
+		return &apiError{err: err}
+	}
+	a.cache.Delete(ctx, cache.KeyShare(shareID.String()))
+
 	return nil
+}
+
+func (a *apiService) SharesUpload(ctx context.Context, req *api.SharesUploadReqWithContentType, params api.SharesUploadParams) (*api.UploadPart, error) {
+	clientUploadID := strings.TrimSpace(params.UploadId)
+	if clientUploadID == "" {
+		return nil, &apiError{err: errors.New("uploadId is required"), code: http.StatusBadRequest}
+	}
+	if params.ContentLength <= 0 {
+		return nil, &apiError{err: errors.New("content length must be positive"), code: http.StatusBadRequest}
+	}
+	if params.ContentLength > shareUploadMaxPartSize {
+		return nil, &apiError{err: errors.New("upload part is too large"), code: http.StatusRequestEntityTooLarge}
+	}
+	if params.PartNo <= 0 || params.PartNo > shareUploadMaxPartNo {
+		return nil, &apiError{err: errors.New("part number is out of range"), code: http.StatusBadRequest}
+	}
+
+	share, err := a.validWritableFolderShare(ctx, uuid.UUID(params.ID), params.ShareToken.Or(""))
+	if err != nil {
+		return nil, err
+	}
+	encryptUploads, err := a.userEncryptFiles(ctx, share.UserID)
+	if err != nil {
+		return nil, err
+	}
+	if encryptUploads && a.cnf.TG.Uploads.EncryptionKey == "" {
+		return nil, &apiError{err: errors.New("encryption is not enabled"), code: http.StatusBadRequest}
+	}
+	if !a.allowShareUpload(share.ID) {
+		return nil, &apiError{err: errors.New("share upload rate limit exceeded"), code: http.StatusTooManyRequests}
+	}
+
+	namespacedUploadID := namespacedShareUploadID(uuid.UUID(params.ID), clientUploadID)
+
+	logger := logging.Component("SHARE_UPLOAD").With(
+		zap.String("share_id", share.ID),
+		zap.String("file_name", params.FileName),
+		zap.Int("part_no", params.PartNo),
+		zap.Int64("size", params.ContentLength),
+	)
+
+	stager, err := a.newUploadStager(ctx, share.UserID, 0)
+	if err != nil {
+		return nil, &apiError{err: err}
+	}
+	defer stager.Close()
+
+	var out api.UploadPart
+	err = stager.Run(ctx, func(ctx context.Context) error {
+		partUpload, err := stager.StagePart(ctx, uploadStagePartRequest{
+			UploadID:  namespacedUploadID,
+			FileName:  params.FileName,
+			PartNo:    params.PartNo,
+			Reader:    req.Content.Data,
+			Size:      params.ContentLength,
+			Encrypted: encryptUploads,
+			Hashing:   params.Hashing.Value,
+			Threads:   a.cnf.TG.Uploads.Threads,
+		}, logger)
+		if err != nil {
+			return err
+		}
+
+		out = api.UploadPart{
+			Name:      partUpload.Name,
+			PartId:    int(partUpload.PartID),
+			ChannelId: partUpload.ChannelID,
+			PartNo:    int(partUpload.PartNo),
+			Size:      partUpload.Size,
+			Encrypted: partUpload.Encrypted,
+		}
+		if partUpload.Salt != nil {
+			out.SetSalt(api.NewOptString(*partUpload.Salt))
+		}
+		return nil
+	})
+	if err != nil {
+		logger.Error("upload.failed", zap.Error(err))
+		return nil, &apiError{err: err}
+	}
+
+	return &out, nil
+}
+
+func (a *apiService) allowShareUpload(shareID string) bool {
+	if !a.cnf.TG.RateLimit {
+		return true
+	}
+	return a.shareLimiters.allow(shareID, time.Millisecond*time.Duration(a.cnf.TG.Rate), a.cnf.TG.RateBurst, time.Now())
+}
+
+func (a *apiService) SharesCreateFile(ctx context.Context, fileIn *api.File, params api.SharesCreateFileParams) (*api.File, error) {
+	share, err := a.validWritableFolderShare(ctx, uuid.UUID(params.ID), params.ShareToken.Or(""))
+	if err != nil {
+		return nil, err
+	}
+
+	rootID, err := uuid.Parse(share.FileID)
+	if err != nil {
+		return nil, &apiError{err: err, code: http.StatusBadRequest}
+	}
+	parentID, err := a.resolveShareParentID(ctx, fileIn, share, rootID)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := a.repo.Files.GetActiveByNameAndParent(ctx, share.UserID, fileIn.Name, parentID); err == nil {
+		return nil, &apiError{err: repositories.ErrConflict}
+	} else if !errors.Is(err, repositories.ErrNotFound) {
+		return nil, &apiError{err: err}
+	}
+
+	fileDB := jetmodel.Files{ID: uuid.New(), UserID: share.UserID, Encrypted: fileIn.Encrypted.Value}
+	fileDB.Status = utils.Ptr(constants.FileStatusActive.String())
+	fileDB.ParentID = parentID
+
+	uploadID := ""
+	switch fileIn.Type {
+	case api.FileTypeFolder:
+		fileDB.MimeType = "drive/folder"
+	case api.FileTypeFile:
+		uploadID, err = a.prepareShareFileUpload(ctx, fileIn, &fileDB, uuid.UUID(params.ID))
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, &apiError{err: errors.New("invalid file type"), code: http.StatusBadRequest}
+	}
+
+	fileDB.Name = fileIn.Name
+	fileDB.Type = string(fileIn.Type)
+	fileDB.CreatedAt = time.Now().UTC()
+	if fileIn.UpdatedAt.IsSet() && !fileIn.UpdatedAt.Value.IsZero() {
+		fileDB.UpdatedAt = fileIn.UpdatedAt.Value
+	} else {
+		fileDB.UpdatedAt = time.Now().UTC()
+	}
+
+	if err := a.persistShareFileAndCleanup(ctx, fileIn, &fileDB, uploadID, share.UserID); err != nil {
+		var apiErr *apiError
+		if errors.As(err, &apiErr) {
+			return nil, apiErr
+		}
+		return nil, &apiError{err: err}
+	}
+
+	return mapper.ToJetFileOut(fileDB), nil
+}
+
+func (a *apiService) validWritableFolderShare(ctx context.Context, shareID uuid.UUID, shareToken string) (*fileShare, error) {
+	share, err := a.validFileShare(ctx, shareID, shareToken)
+	if err != nil {
+		return nil, err
+	}
+	if share.Type != api.FileShareInfoTypeFolder || !share.AllowUpload {
+		return nil, &apiError{err: errors.New("share does not allow uploads"), code: http.StatusForbidden}
+	}
+	return share, nil
+}
+
+func (a *apiService) resolveShareParentID(ctx context.Context, fileIn *api.File, share *fileShare, rootID uuid.UUID) (*uuid.UUID, error) {
+	if fileIn.ParentId.IsSet() {
+		parentUUID := uuid.UUID(fileIn.ParentId.Value)
+		if parentUUID == rootID {
+			return &rootID, nil
+		}
+		parent, err := a.repo.Files.GetByIDAndUserInSubtree(ctx, parentUUID, share.UserID, rootID)
+		if err != nil {
+			if errors.Is(err, repositories.ErrNotFound) {
+				return nil, &apiError{err: fileNotFound(parentUUID, err)}
+			}
+			return nil, &apiError{err: err}
+		}
+		if parent.Type != string(api.FileTypeFolder) {
+			return nil, &apiError{err: errors.New("parent is not a folder"), code: http.StatusConflict}
+		}
+		return &parentUUID, nil
+	}
+
+	rawPath := strings.TrimSpace(fileIn.Path.Value)
+	if rawPath == "" || rawPath == "/" {
+		return &rootID, nil
+	}
+	for _, segment := range strings.Split(rawPath, "/") {
+		if segment == ".." {
+			return nil, &apiError{err: errors.New("path escapes shared folder"), code: http.StatusForbidden}
+		}
+	}
+
+	relativePath := strings.TrimPrefix(path.Clean("/"+strings.Trim(rawPath, "/")), "/")
+	fullPath := path.Join(share.Path, relativePath)
+	parentID, err := a.repo.Files.ResolvePathID(ctx, fullPath, share.UserID)
+	if err != nil {
+		if errors.Is(err, repositories.ErrNotFound) {
+			return nil, &apiError{err: err, code: http.StatusNotFound}
+		}
+		return nil, &apiError{err: err}
+	}
+	if parentID == nil {
+		return nil, &apiError{err: errors.New("destination path not found"), code: http.StatusNotFound}
+	}
+	if _, err := a.repo.Files.GetByIDAndUserInSubtree(ctx, *parentID, share.UserID, rootID); err != nil {
+		if errors.Is(err, repositories.ErrNotFound) {
+			return nil, &apiError{err: errors.New("destination path is outside shared folder"), code: http.StatusForbidden}
+		}
+		return nil, &apiError{err: err}
+	}
+	return parentID, nil
+}
+
+func (a *apiService) prepareShareFileUpload(_ context.Context, fileIn *api.File, fileDB *jetmodel.Files, shareID uuid.UUID) (string, error) {
+	fileDB.MimeType = fileIn.MimeType.Value
+	fileDB.Category = utils.Ptr(string(category.GetCategory(fileIn.Name)))
+
+	clientUploadID := strings.TrimSpace(fileIn.UploadId.Value)
+	if clientUploadID == "" {
+		return "", &apiError{err: errors.New("share file finalization requires uploadId"), code: http.StatusBadRequest}
+	}
+	uploadID := namespacedShareUploadID(shareID, clientUploadID)
+	if len(fileIn.Parts) > 0 {
+		return "", &apiError{err: errors.New("share uploads must be finalized by uploadId"), code: http.StatusBadRequest}
+	}
+	return uploadID, nil
+}
+
+func applyShareStagedUploads(fileIn *api.File, fileDB *jetmodel.Files, uploads []jetmodel.Uploads) error {
+	channelID, totalSize, encrypted, parts, err := validateShareStagedUploads(uploads, fileIn.Size.Value)
+	if err != nil {
+		return err
+	}
+	fileDB.ChannelID = &channelID
+	fileDB.Encrypted = encrypted
+	size := fileIn.Size.Value
+	if size == 0 {
+		size = totalSize
+	}
+	if len(parts) > 0 {
+		fileDB.Parts = mapper.ToDBPartsJSONB(parts)
+	}
+	fileDB.Hash = uploadTreeHash(uploads)
+	fileDB.Size = utils.Ptr(size)
+	return nil
+}
+
+func validateShareStagedUploads(uploads []jetmodel.Uploads, requestedSize int64) (int64, int64, bool, []api.Part, error) {
+	channelID := uploads[0].ChannelID
+	encrypted := uploads[0].Encrypted
+	parts := make([]api.Part, 0, len(uploads))
+	seenPartNos := make(map[int32]struct{}, len(uploads))
+	totalSize := int64(0)
+	for index, upload := range uploads {
+		expectedPartNo := int32(index + 1)
+		if upload.PartNo != expectedPartNo {
+			return 0, 0, false, nil, &apiError{err: errors.New("upload parts must be contiguous and ordered"), code: http.StatusBadRequest}
+		}
+		if _, ok := seenPartNos[upload.PartNo]; ok {
+			return 0, 0, false, nil, &apiError{err: errors.New("duplicate upload part number"), code: http.StatusBadRequest}
+		}
+		seenPartNos[upload.PartNo] = struct{}{}
+		if upload.PartID == 0 {
+			return 0, 0, false, nil, &apiError{err: errors.New("invalid part: part_id cannot be zero"), code: http.StatusBadRequest}
+		}
+		if upload.ChannelID != channelID {
+			return 0, 0, false, nil, &apiError{err: errors.New("upload parts span multiple channels"), code: http.StatusBadRequest}
+		}
+		if upload.Size <= 0 {
+			return 0, 0, false, nil, &apiError{err: errors.New("invalid upload part size"), code: http.StatusBadRequest}
+		}
+		if upload.Encrypted != encrypted {
+			return 0, 0, false, nil, &apiError{err: errors.New("upload parts mix encrypted and plaintext data"), code: http.StatusBadRequest}
+		}
+		salt := ""
+		if upload.Salt != nil {
+			salt = strings.TrimSpace(*upload.Salt)
+		}
+		if encrypted {
+			if salt == "" {
+				return 0, 0, false, nil, &apiError{err: errors.New("encrypted upload part requires salt"), code: http.StatusBadRequest}
+			}
+		} else if salt != "" {
+			return 0, 0, false, nil, &apiError{err: errors.New("plaintext upload part cannot include salt"), code: http.StatusBadRequest}
+		}
+		logicalSize := upload.Size
+		if encrypted {
+			decryptedSize, err := crypt.DecryptedSize(upload.Size)
+			if err != nil {
+				return 0, 0, false, nil, &apiError{err: err, code: http.StatusBadRequest}
+			}
+			logicalSize = decryptedSize
+		}
+		if logicalSize <= 0 || logicalSize > shareUploadMaxPartSize {
+			return 0, 0, false, nil, &apiError{err: errors.New("invalid upload part size"), code: http.StatusBadRequest}
+		}
+		totalSize += logicalSize
+		part := api.Part{ID: int(upload.PartID)}
+		if encrypted {
+			part.Salt = api.NewOptString(salt)
+		}
+		parts = append(parts, part)
+	}
+	if requestedSize < 0 {
+		return 0, 0, false, nil, &apiError{err: errors.New("file size cannot be negative"), code: http.StatusBadRequest}
+	}
+	if requestedSize > 0 && requestedSize != totalSize {
+		return 0, 0, false, nil, &apiError{err: errors.New("file size does not match staged parts"), code: http.StatusBadRequest}
+	}
+	return channelID, totalSize, encrypted, parts, nil
+}
+
+func (a *apiService) persistShareFileAndCleanup(ctx context.Context, fileIn *api.File, fileDB *jetmodel.Files, uploadID string, userID int64) error {
+	if err := a.repo.WithTx(ctx, func(txCtx context.Context) error {
+		if uploadID != "" {
+			user, err := a.repo.Users.GetByIDForUpdate(txCtx, userID)
+			if err != nil {
+				return err
+			}
+			uploads, err := a.repo.Uploads.ConsumeByUploadIDAndUserID(txCtx, uploadID, userID)
+			if err != nil {
+				return err
+			}
+			if len(uploads) == 0 {
+				return &apiError{err: errors.New("share file finalization requires staged parts"), code: http.StatusBadRequest}
+			}
+			if uploads[0].Encrypted != user.EncryptFiles {
+				return &apiError{err: errors.New("staged upload encryption does not match current owner policy"), code: http.StatusBadRequest}
+			}
+			if user.EncryptFiles && a.cnf.TG.Uploads.EncryptionKey == "" {
+				return &apiError{err: errors.New("encryption is not enabled"), code: http.StatusBadRequest}
+			}
+			if err := applyShareStagedUploads(fileIn, fileDB, uploads); err != nil {
+				return err
+			}
+		}
+		if err := a.repo.Files.Create(txCtx, fileDB); err != nil {
+			return err
+		}
+		if err := a.incrementShareFileAncestorSizes(txCtx, *fileDB, userID); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	a.invalidateFileCache(ctx, fileDB.ID.String(), fileDB.Parts != nil)
+	parentID := ""
+	if fileDB.ParentID != nil {
+		parentID = fileDB.ParentID.String()
+	}
+	a.events.Record(events.OpCreate, userID, &dto.Source{
+		ID:       fileDB.ID.String(),
+		Type:     fileDB.Type,
+		Name:     fileDB.Name,
+		ParentID: parentID,
+	})
+	return nil
+}
+
+func (a *apiService) incrementShareFileAncestorSizes(ctx context.Context, fileDB jetmodel.Files, userID int64) error {
+	if fileDB.Type != string(api.FileTypeFile) || fileDB.ParentID == nil || fileDB.Size == nil || *fileDB.Size == 0 {
+		return nil
+	}
+	return a.repo.Files.IncrementActiveAncestorFolderSizes(ctx, userID, *fileDB.ParentID, *fileDB.Size)
 }
 
 func (a *apiService) FilesGetById(ctx context.Context, params api.FilesGetByIdParams) (*api.File, error) {
@@ -586,18 +1027,20 @@ func (a *apiService) FilesStreamHead(ctx context.Context, params api.FilesStream
 	contentDisposition := mime.FormatMediaType(disposition, map[string]string{"filename": file.Name})
 	lastModified := file.UpdatedAt.UTC()
 
-	if rawRange, ok := params.Range.Get(); ok && rawRange != "" && contentLength > 0 {
+	if rawRange, ok := params.Range.Get(); ok && rawRange != "" {
+		if contentLength == 0 {
+			return &api.FilesStreamHeadRequestedRangeNotSatisfiable{ContentRange: "bytes */0"}, nil
+		}
+		if strings.Contains(rawRange, ",") {
+			return nil, &apiError{err: fmt.Errorf("multiple ranges are not supported"), code: http.StatusBadRequest}
+		}
 		ranges, err := http_range.Parse(rawRange, contentLength)
 		if err == http_range.ErrNoOverlap {
-			return nil, &apiError{err: err, code: http.StatusRequestedRangeNotSatisfiable}
+			return &api.FilesStreamHeadRequestedRangeNotSatisfiable{ContentRange: fmt.Sprintf("bytes */%d", contentLength)}, nil
 		}
 		if err != nil {
 			return nil, &apiError{err: err, code: http.StatusBadRequest}
 		}
-		if len(ranges) > 1 {
-			return nil, &apiError{err: fmt.Errorf("multiple ranges are not supported"), code: http.StatusRequestedRangeNotSatisfiable}
-		}
-
 		start := ranges[0].Start
 		end := ranges[0].End
 		return &api.FilesStreamHeadPartialContent{
@@ -732,7 +1175,7 @@ func (a *apiService) FilesListShares(ctx context.Context, params api.FilesListSh
 
 	res := make([]api.FileShare, 0, len(result))
 	for _, item := range result {
-		share := api.FileShare{ID: api.UUID(item.ID)}
+		share := api.FileShare{ID: api.UUID(item.ID), AllowUpload: item.AllowUpload}
 		if item.Password != nil {
 			share.Protected = true
 		}
@@ -763,7 +1206,7 @@ func (a *apiService) FilesUpdate(ctx context.Context, req *api.FileUpdate, param
 		}
 		file = updated
 		if uploadId != "" {
-			if err := a.repo.Uploads.Delete(txCtx, uploadId); err != nil {
+			if err := a.repo.Uploads.DeleteByUploadIDAndUserID(txCtx, uploadId, userId); err != nil {
 				return err
 			}
 		}
@@ -796,8 +1239,11 @@ func (a *apiService) buildFileUpdate(ctx context.Context, req *api.FileUpdate) (
 
 	if req.UploadId.IsSet() && req.UploadId.Value != "" {
 		uploadId = req.UploadId.Value
-		if uploads, err = a.repo.Uploads.GetByUploadID(ctx, uploadId); err != nil {
+		if uploads, err = a.repo.Uploads.GetByUploadIDAndUserID(ctx, uploadId, auth.User(ctx)); err != nil {
 			return repositories.FileUpdate{}, "", err
+		}
+		if len(uploads) == 0 {
+			return repositories.FileUpdate{}, "", repositories.ErrNotFound
 		}
 		totalSize, parts := a.buildPartsFromUploads(uploads)
 		req.Parts = parts

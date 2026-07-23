@@ -213,7 +213,10 @@ func (r *Reader) readPartAt(p []byte, part types.Part, off int64) (int, error) {
 		}
 		rc, err = ciph.DecryptDataSeek(r.ctx,
 			func(ctx context.Context, underlyingOffset, underlyingLimit int64) (io.ReadCloser, error) {
-				end := min(part.Size-1, underlyingOffset+underlyingLimit-1)
+				end := part.Size - 1
+				if underlyingLimit >= 0 {
+					end = min(end, underlyingOffset+underlyingLimit-1)
+				}
 				return newTGMultiReader(ctx, underlyingOffset, end, r.config, chunkSrc)
 			}, off, span)
 		if err != nil {

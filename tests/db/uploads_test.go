@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -67,6 +68,91 @@ func TestUploadCreateAndGet(t *testing.T) {
 	}
 	if got.UserID == nil || *got.UserID != uid {
 		t.Errorf("UserID = %v, want %d", got.UserID, uid)
+	}
+}
+
+func TestUploadConsumeByUploadIDAndUserIDDeletesAndReturnsOrderedParts(t *testing.T) {
+	s := newHarness(t)
+	ctx := context.Background()
+	uid := int64(8106)
+	s.ensureUserExists(uid)
+
+	repo := s.repos.Uploads
+	uploadID := "consume-ordered-upload"
+	now := time.Now().UTC()
+	salt := "salt-2"
+	blockHashes := []byte{1, 2, 3, 4}
+	parts := []jetmodel.Uploads{
+		{UploadID: uploadID, Name: "part-2", UserID: &uid, PartNo: 2, PartID: 602, ChannelID: 910006, Size: 200, Encrypted: true, Salt: &salt, BlockHashes: &blockHashes, CreatedAt: &now},
+		{UploadID: uploadID, Name: "part-1", UserID: &uid, PartNo: 1, PartID: 601, ChannelID: 910006, Size: 100, Encrypted: true, CreatedAt: &now},
+	}
+	for i := range parts {
+		if err := repo.Create(ctx, &parts[i]); err != nil {
+			t.Fatalf("Create part %d: %v", parts[i].PartNo, err)
+		}
+	}
+
+	consumed, err := repo.ConsumeByUploadIDAndUserID(ctx, uploadID, uid)
+	if err != nil {
+		t.Fatalf("ConsumeByUploadIDAndUserID: %v", err)
+	}
+	if len(consumed) != 2 {
+		t.Fatalf("expected 2 consumed rows, got %d", len(consumed))
+	}
+	if consumed[0].PartNo != 1 || consumed[0].PartID != 601 || consumed[0].Name != "part-1" {
+		t.Fatalf("first consumed row = %+v, want part_no=1 part_id=601 name=part-1", consumed[0])
+	}
+	if consumed[1].PartNo != 2 || consumed[1].PartID != 602 || consumed[1].Name != "part-2" {
+		t.Fatalf("second consumed row = %+v, want part_no=2 part_id=602 name=part-2", consumed[1])
+	}
+	if consumed[1].Salt == nil || *consumed[1].Salt != salt {
+		t.Fatalf("expected consumed salt %q, got %+v", salt, consumed[1].Salt)
+	}
+	if consumed[1].BlockHashes == nil || string(*consumed[1].BlockHashes) != string(blockHashes) {
+		t.Fatalf("expected consumed block hashes %v, got %+v", blockHashes, consumed[1].BlockHashes)
+	}
+	remaining, err := repo.GetByUploadIDAndUserID(ctx, uploadID, uid)
+	if err != nil {
+		t.Fatalf("GetByUploadIDAndUserID after consume: %v", err)
+	}
+	if len(remaining) != 0 {
+		t.Fatalf("expected consumed rows deleted, got %d", len(remaining))
+	}
+}
+
+func TestUploadConsumeByUploadIDAndUserIDRollbackRestoresRows(t *testing.T) {
+	s := newHarness(t)
+	ctx := context.Background()
+	uid := int64(8107)
+	s.ensureUserExists(uid)
+
+	uploadID := "consume-rollback-upload"
+	now := time.Now().UTC()
+	if err := s.repos.Uploads.Create(ctx, &jetmodel.Uploads{UploadID: uploadID, Name: "rollback-part", UserID: &uid, PartNo: 1, PartID: 701, ChannelID: 910007, Size: 50, CreatedAt: &now}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	sentinel := errors.New("rollback sentinel")
+	err := s.repos.WithTx(ctx, func(txCtx context.Context) error {
+		consumed, err := s.repos.Uploads.ConsumeByUploadIDAndUserID(txCtx, uploadID, uid)
+		if err != nil {
+			return err
+		}
+		if len(consumed) != 1 {
+			t.Fatalf("expected one consumed row inside tx, got %d", len(consumed))
+		}
+		return sentinel
+	})
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("expected sentinel rollback error, got %v", err)
+	}
+
+	restored, err := s.repos.Uploads.GetByUploadIDAndUserID(ctx, uploadID, uid)
+	if err != nil {
+		t.Fatalf("GetByUploadIDAndUserID after rollback: %v", err)
+	}
+	if len(restored) != 1 || restored[0].PartID != 701 {
+		t.Fatalf("expected rollback to restore part 701, got %+v", restored)
 	}
 }
 

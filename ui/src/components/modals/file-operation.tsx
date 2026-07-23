@@ -20,11 +20,13 @@ import ShowPasswordIcon from "~icons/mdi/eye-outline";
 import HidePasswordIcon from "~icons/mdi/eye-off-outline";
 import MdiProtectedOutline from "~icons/mdi/protected-outline";
 import { $api } from "@/utils/api";
-import { useSearch } from "@tanstack/react-router";
 import { deleteConfirmation } from "@/utils/delete-files";
 
 interface FileModalProps {
   queryKey: any;
+  mode?: "drive" | "share";
+  shareId?: string;
+  path?: string;
 }
 
 interface RenameDialogProps {
@@ -101,14 +103,21 @@ const RenameDialog = memo(({ queryKey, handleClose }: RenameDialogProps) => {
 interface FolderCreateDialogProps {
   queryKey: any;
   handleClose: () => void;
+  mode?: "drive" | "share";
+  shareId?: string;
+  path?: string;
 }
 
-const FolderCreateDialog = memo(({ queryKey, handleClose }: FolderCreateDialogProps) => {
+const FolderCreateDialog = memo(({ queryKey, handleClose, mode = "drive", shareId, path }: FolderCreateDialogProps) => {
   const queryClient = useQueryClient();
 
-  const { path } = useSearch({ from: "/_authed/$view" });
-
   const createFolder = $api.useMutation("post", "/files", {
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
+  const createShareFolder = $api.useMutation("post", "/shares/{id}/files", {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
     },
@@ -123,18 +132,34 @@ const FolderCreateDialog = memo(({ queryKey, handleClose }: FolderCreateDialogPr
   const onCreate = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-      createFolder
-        .mutateAsync({
-          body: {
-            name: currentFile.name,
-            path: path ? path : "/",
-            type: "folder",
+      const body = {
+        name: currentFile.name,
+        path: path || "/",
+        type: "folder" as const,
+      };
+      const request = mode === "share" && shareId
+        ? createShareFolder.mutateAsync({
+          body,
+          params: {
+            path: {
+              id: shareId,
+            },
           },
         })
+        : createFolder.mutateAsync({
+          body: {
+            name: currentFile.name,
+            path: path || "/",
+            type: "folder",
+          },
+        });
+      request
         .then(() => handleClose());
     },
-    [currentFile.name],
+    [currentFile.name, mode, path, shareId],
   );
+
+  const isPending = mode === "share" ? createShareFolder.isPending : createFolder.isPending;
 
   return (
     <>
@@ -161,9 +186,9 @@ const FolderCreateDialog = memo(({ queryKey, handleClose }: FolderCreateDialogPr
           className="font-normal"
           variant="secondary"
           form="create-folder-form"
-          isDisabled={createFolder.isPending || !currentFile.name}
+          isDisabled={isPending || !currentFile.name}
         >
-          {createFolder.isPending ? "Creating" : "Create"}
+          {isPending ? "Creating" : "Create"}
         </Button>
       </Modal.Footer>
     </>
@@ -221,8 +246,23 @@ interface ShareFileDialogProps {
 }
 
 const defaultShareOptions = {
+  allowUpload: false,
   expirationDate: "",
   password: "",
+};
+
+type ShareFormOptions = typeof defaultShareOptions;
+
+type SharePayload = {
+  allowUpload?: boolean;
+  password?: string;
+  expiresAt?: string;
+};
+
+type ShareEntry = {
+  id: string;
+  protected: boolean;
+  allowUpload?: boolean;
 };
 
 const ShareFileDialog = memo(({ handleClose }: ShareFileDialogProps) => {
@@ -230,7 +270,7 @@ const ShareFileDialog = memo(({ handleClose }: ShareFileDialogProps) => {
 
   const queryClient = useQueryClient();
 
-  const { control, handleSubmit } = useForm({
+  const { control, handleSubmit, reset } = useForm<ShareFormOptions>({
     defaultValues: defaultShareOptions,
   });
 
@@ -245,6 +285,13 @@ const ShareFileDialog = memo(({ handleClose }: ShareFileDialogProps) => {
   const { data, isLoading } = useQuery(shareQueryOptions);
 
   const createShare = $api.useMutation("post", "/files/{id}/shares", {
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: shareQueryOptions.queryKey });
+      queryClient.invalidateQueries({ queryKey: ["Files_list", "shared"] });
+    },
+  });
+
+  const editShare = $api.useMutation("patch", "/files/{id}/shares/{shareId}", {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: shareQueryOptions.queryKey });
       queryClient.invalidateQueries({ queryKey: ["Files_list", "shared"] });
@@ -267,12 +314,15 @@ const ShareFileDialog = memo(({ handleClose }: ShareFileDialogProps) => {
     setSharingOn((prev) => {
       if (!prev) {
         handleSubmit((data) => {
-          const payload = {} as { password?: string; expiresAt?: string };
+          const payload = {} as SharePayload;
           if (data.expirationDate) {
             payload.expiresAt = `${data.expirationDate}${new Date().toISOString().slice(10)}`;
           }
           if (data.password) {
             payload.password = data.password;
+          }
+          if (file.type === "folder") {
+            payload.allowUpload = data.allowUpload;
           }
           createShare.mutateAsync({
             body: payload,
@@ -302,14 +352,35 @@ const ShareFileDialog = memo(({ handleClose }: ShareFileDialogProps) => {
       }
       return !prev;
     });
-  }, []);
+  }, [createShare, data, deleteShare, file.id, file.type, handleSubmit]);
+
+  const onAllowUploadChange = useCallback((allowUpload: boolean) => {
+    const shareId = data?.[0]?.id;
+    if (!shareId || file.type !== "folder") {
+      return;
+    }
+    editShare.mutateAsync({
+      body: { allowUpload } as SharePayload,
+      params: {
+        path: {
+          id: file.id,
+          shareId,
+        },
+      },
+    });
+  }, [data, editShare, file.id, file.type]);
 
   useEffect(() => {
     if (data && data.length > 0) {
+      const share = data[0] as ShareEntry;
       setSharingOn(true);
-      setShareLink(`${window.location.origin}/share/${data[0].id}`);
+      reset((currentValues) => ({
+        ...currentValues,
+        allowUpload: Boolean(share.allowUpload),
+      }));
+      setShareLink(`${window.location.origin}/share/${share.id}`);
     }
-  }, [data]);
+  }, [data, reset]);
 
   return (
     <>
@@ -363,6 +434,37 @@ const ShareFileDialog = memo(({ handleClose }: ShareFileDialogProps) => {
               </div>
             )}
           />
+          {file.type === "folder" && (
+            <>
+              <div className="col-span-6 xs:col-span-3">
+                <p className="text-lg font-medium">Allow uploads and folder creation</p>
+                <p className="text-sm font-normal text-muted">Recipients can add files and folders to this share</p>
+              </div>
+              <Controller
+                name="allowUpload"
+                control={control}
+                render={({ field }) => (
+                  <Switch
+                    className="col-span-6 xs:col-span-3 justify-self-start"
+                    isSelected={field.value}
+                    isDisabled={editShare.isPending}
+                    onChange={(isSelected) => {
+                      field.onChange(isSelected);
+                      if (sharingOn) {
+                        onAllowUploadChange(isSelected);
+                      }
+                    }}
+                    size="md"
+                    aria-label="Allow uploads and folder creation"
+                  >
+                    <Switch.Control>
+                      <Switch.Thumb />
+                    </Switch.Control>
+                  </Switch>
+                )}
+              />
+            </>
+          )}
         </form>
         <Separator />
         <div className="flex justify-between">
@@ -391,7 +493,7 @@ const ShareFileDialog = memo(({ handleClose }: ShareFileDialogProps) => {
   );
 });
 
-export const FileOperationModal = memo(({ queryKey }: FileModalProps) => {
+export const FileOperationModal = memo(({ queryKey, mode = "drive", shareId, path }: FileModalProps) => {
   const { open, operation, actions } = useModalStore(
     useShallow((state) => ({
       actions: state.actions,
@@ -413,7 +515,7 @@ export const FileOperationModal = memo(({ queryKey }: FileModalProps) => {
       case FbActions.RenameFile.id:
         return <RenameDialog queryKey={queryKey} handleClose={handleClose} />;
       case FbActions.CreateFolder.id:
-        return <FolderCreateDialog queryKey={queryKey} handleClose={handleClose} />;
+        return <FolderCreateDialog queryKey={queryKey} handleClose={handleClose} mode={mode} shareId={shareId} path={path} />;
       case FbActions.DeleteFiles.id:
         return <DeleteDialog handleClose={handleClose} />;
       case CustomActions.ShareFiles.id:

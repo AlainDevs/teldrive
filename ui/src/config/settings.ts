@@ -7,7 +7,7 @@ export type FieldType =
   | "switch"
   | "textarea";
 
-type SettingKeys =
+export type SettingKeys =
   | "uploadConcurrency"
   | "uploadRetries"
   | "uploadRetryDelay"
@@ -19,7 +19,7 @@ type SettingKeys =
   | "rcloneProxy"
   | "taskPollingInterval";
 
-type SettingValue = string | number | boolean;
+export type SettingValue = string | number | boolean;
 
 export interface SettingFieldConfig<T> {
   key: SettingKeys;
@@ -96,7 +96,7 @@ export const generalSettingsConfig: SettingFieldConfig<SettingValue>[] = [
   {
     category: "upload",
     defaultValue: false,
-    description: "Encrypt Files before uploading",
+    description: "Encrypt authenticated and writable-share uploads",
     key: "encryptFiles",
     label: "Encrypt Files",
     type: "switch",

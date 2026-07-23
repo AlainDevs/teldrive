@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-jet/jet/v2/postgres"
 	"github.com/go-jet/jet/v2/qrm"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/tgdrive/teldrive/internal/database/jet/gen/model"
@@ -57,8 +58,34 @@ func (r *JetUserRepository) GetByID(ctx context.Context, userID int64) (*model.U
 	return &out, nil
 }
 
+func (r *JetUserRepository) GetByIDForUpdate(ctx context.Context, userID int64) (*model.Users, error) {
+	var out model.Users
+	err := r.db.executor(ctx).QueryRow(ctx, `
+		SELECT user_id, name, user_name, is_premium, created_at, updated_at, encrypt_files
+		FROM users
+		WHERE user_id = $1
+		FOR UPDATE
+	`, userID).Scan(
+		&out.UserID,
+		&out.Name,
+		&out.UserName,
+		&out.IsPremium,
+		&out.CreatedAt,
+		&out.UpdatedAt,
+		&out.EncryptFiles,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, normalizeDBError(err)
+	}
+
+	return &out, nil
+}
+
 func (r *JetUserRepository) Update(ctx context.Context, userID int64, update UserUpdate) error {
-	updates := make([]postgres.ColumnAssigment, 0, 4)
+	updates := make([]postgres.ColumnAssigment, 0, 5)
 
 	if update.Name != nil {
 		updates = append(updates, table.Users.Name.SET(postgres.String(*update.Name)))
@@ -69,8 +96,15 @@ func (r *JetUserRepository) Update(ctx context.Context, userID int64, update Use
 	if update.IsPremium != nil {
 		updates = append(updates, table.Users.IsPremium.SET(postgres.Bool(*update.IsPremium)))
 	}
+	if update.EncryptFiles != nil {
+		updates = append(updates, table.Users.EncryptFiles.SET(postgres.Bool(*update.EncryptFiles)))
+	}
 
-	updates = append(updates, table.Users.UpdatedAt.SET(postgres.TimestampzT(time.Now().UTC())))
+	updatedAt := time.Now().UTC()
+	if update.UpdatedAt != nil {
+		updatedAt = *update.UpdatedAt
+	}
+	updates = append(updates, table.Users.UpdatedAt.SET(postgres.TimestampzT(updatedAt)))
 
 	stmt := table.Users.UPDATE().WHERE(table.Users.UserID.EQ(postgres.Int64(userID)))
 	stmt = stmt.SET(updates[0], assignmentArgs(updates[1:])...)

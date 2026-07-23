@@ -110,6 +110,16 @@ model FileStreamHead {
   lastModified: utcDateTime;
 }
 
+@doc("Unsatisfiable byte range response")
+model RangeNotSatisfiable {
+  @statusCode
+  statusCode: 416;
+
+  @header("Content-Range")
+  @doc("Current file size for an unsatisfiable range")
+  contentRange: string;
+}
+
 @error
 @doc("Standard error response")
 model Error {
@@ -493,6 +503,9 @@ model FileShareCreate {
 
   @doc("Share expiration date")
   expiresAt?: utcDateTime;
+
+  @doc("Allow recipients to upload files and create folders")
+  allowUpload?: boolean;
 }
 
 @doc("Lightweight file sharing information")
@@ -507,6 +520,9 @@ model FileShare {
 
   @doc("Expiration date and time of the share link")
   expiresAt?: utcDateTime;
+
+  @doc("Whether recipients can upload files and create folders")
+  allowUpload: boolean;
 }
 
 @doc("Detailed file sharing information")
@@ -536,6 +552,9 @@ model FileShareDetail {
 
   @doc("Expiration date and time of the share link")
   expiresAt?: utcDateTime;
+
+  @doc("Whether recipients can upload files and create folders")
+  allowUpload: boolean;
 }
 
 @doc("Paginated file listing response with metadata")
@@ -874,7 +893,7 @@ interface Files {
     @path id: UUID,
     @query download?: "0" | "1" = "0",
     @header("Range") range?: string,
-  ): FileStreamHead | Error;
+  ): FileStreamHead | RangeNotSatisfiable | Error;
 
   @route("/categories")
   @get
@@ -1066,14 +1085,23 @@ model UserApiKeyCreateResult {
   key: string;
 }
 
-@doc("User configuration for channel and bot settings")
-@example(#{ channelId: 123456789, bots: #["bot1", "bot2"] })
+@doc("User configuration for channel, bot, and upload policy settings")
+@example(#{ channelId: 123456789, bots: #["bot1", "bot2"], encryptFiles: false })
 model UserConfig {
   @doc("Channel identifier associated with the user")
   channelId: int64;
 
   @doc("List of bot tokens")
   bots: string[];
+
+  @doc("Whether files uploaded through writable shares are encrypted")
+  encryptFiles: boolean;
+}
+
+@doc("User configuration update")
+model UserConfigUpdate {
+  @doc("Whether files uploaded through writable shares are encrypted")
+  encryptFiles?: boolean;
 }
 
 @route("/users")
@@ -1097,6 +1125,11 @@ interface Users {
   @get
   @summary("Get user config")
   stats(): UserConfig | Error;
+
+  @route("/config")
+  @patch(#{ implicitOptionality: true })
+  @summary("Update user config")
+  updateConfig(@body body: UserConfigUpdate): NoContentResponse | Error;
 
   @route("/channels")
   @get
@@ -1180,7 +1213,32 @@ model FileShareInfo {
   @doc("Share Protection Status")
   @example(false)
   protected: boolean;
+
+  @doc("Whether recipients can upload files and create folders")
+  allowUpload: boolean;
+
+  @doc("Whether uploads to this share are encrypted by owner policy")
+  encryptUploads: boolean;
 }
+
+model ShareUploadQuery {
+  @doc("Original file name")
+  @query
+  fileName: string;
+
+  @doc("Sequential part number")
+  @query
+  partNo: integer;
+
+  @doc("Whether the upload content is encrypted")
+  @query
+  encrypted?: boolean = false;
+
+  @doc("Enable BLAKE3 hashing for integrity checking")
+  @query
+  hashing?: boolean = true;
+}
+
 model ShareUnlock {
   @doc("Share password")
   @example("securepass123")
@@ -1243,6 +1301,28 @@ interface Shares {
   @summary("List files in share")
   listFiles(@path id: UUID, @cookie(#{ name: "share_token" }) shareToken?: string, ...ShareQuery): FileList | Error;
 
+  @route("/{id}/files")
+  @post
+  @summary("Create file or folder in share")
+  createFile(
+    @path id: UUID,
+    @cookie(#{ name: "share_token" }) shareToken?: string,
+    @body body: File,
+  ): File | Error;
+
+  @route("/{id}/uploads/{uploadId}")
+  @post
+  @summary("Upload file part to share")
+  upload(
+    @path id: UUID,
+    @path uploadId: string,
+    @cookie(#{ name: "share_token" }) shareToken?: string,
+    @header("Content-Type") contentType?: string,
+    @header("Content-Length") contentLength: int64,
+    @bodyRoot body: bytes,
+    ...ShareUploadQuery,
+  ): UploadPart | Error;
+
   @route("/{id}/files/{fileId}/content")
   @get
   @summary("Stream or Download shared file")
@@ -1251,6 +1331,7 @@ interface Shares {
     @path fileId: UUID,
     @cookie(#{ name: "share_token" }) shareToken?: string,
     @query download?: "0" | "1" = "0",
+    @header("Range") range?: string,
   ): FileStream | Error;
 }
 

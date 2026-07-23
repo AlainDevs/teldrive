@@ -19,9 +19,10 @@ export const Route = createFileRoute("/_share/share/$id")({
       }),
     );
     const unlocked = JSON.parse(sessionStorage.getItem(shareUnlockStorageKey(id)) || "false");
+    const search = deps as { path?: string };
     const queryParams = {
       id,
-      path: deps.path || "",
+      path: search.path || "",
     } as ShareListParams;
 
     if (res.protected && !unlocked) {

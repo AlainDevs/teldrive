@@ -819,6 +819,14 @@ paths:
                             schema:
                                 type: string
                                 format: http-date
+                '416':
+                    description: Unsatisfiable byte range response
+                    headers:
+                        Content-Range:
+                            required: true
+                            description: Current file size for an unsatisfiable range
+                            schema:
+                                type: string
                 default:
                     description: An unexpected error response.
                     content:
@@ -1247,6 +1255,42 @@ paths:
                                 $ref: '#/components/schemas/Error'
             tags:
                 - Shares
+        post:
+            operationId: Shares_createFile
+            summary: Create file or folder in share
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    $ref: '#/components/schemas/UUID'
+                - name: share_token
+                  in: cookie
+                  required: false
+                  schema:
+                    type: string
+                  explode: false
+            responses:
+                '200':
+                    description: The request has succeeded.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/File'
+                default:
+                    description: An unexpected error response.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+            tags:
+                - Shares
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/File'
     /shares/{id}/files/{fileId}/content:
         get:
             operationId: Shares_stream
@@ -1278,6 +1322,11 @@ paths:
                         - '1'
                     default: '0'
                   explode: false
+                - name: Range
+                  in: header
+                  required: false
+                  schema:
+                    type: string
             responses:
                 '200':
                     description: File streaming response
@@ -1403,6 +1452,59 @@ paths:
                     application/json:
                         schema:
                             $ref: '#/components/schemas/ShareUnlock'
+    /shares/{id}/uploads/{uploadId}:
+        post:
+            operationId: Shares_upload
+            summary: Upload file part to share
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    $ref: '#/components/schemas/UUID'
+                - name: uploadId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: share_token
+                  in: cookie
+                  required: false
+                  schema:
+                    type: string
+                  explode: false
+                - name: Content-Length
+                  in: header
+                  required: true
+                  schema:
+                    type: integer
+                    format: int64
+                - $ref: '#/components/parameters/ShareUploadQuery.fileName'
+                - $ref: '#/components/parameters/ShareUploadQuery.partNo'
+                - $ref: '#/components/parameters/ShareUploadQuery.encrypted'
+                - $ref: '#/components/parameters/ShareUploadQuery.hashing'
+            responses:
+                '200':
+                    description: The request has succeeded.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UploadPart'
+                default:
+                    description: An unexpected error response.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+            tags:
+                - Shares
+            requestBody:
+                required: true
+                content:
+                    '*/*':
+                        schema:
+                            type: string
+                            format: binary
     /uploads/stats:
         get:
             operationId: Uploads_stats
@@ -1806,6 +1908,31 @@ paths:
                 - BearerAuth: []
                 - AccessTokenCookieAuth: []
                 - XApiKeyHeaderAuth: []
+        patch:
+            operationId: Users_updateConfig
+            summary: Update user config
+            parameters: []
+            responses:
+                '204':
+                    description: There is no content to send for this request, but the headers may be useful.
+                default:
+                    description: An unexpected error response.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+            tags:
+                - Users
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UserConfigUpdate'
+            security:
+                - BearerAuth: []
+                - AccessTokenCookieAuth: []
+                - XApiKeyHeaderAuth: []
     /users/profile:
         get:
             operationId: Users_profileImage
@@ -2164,6 +2291,40 @@ components:
                     - size
                     - id
                 default: name
+            explode: false
+        ShareUploadQuery.encrypted:
+            name: encrypted
+            in: query
+            required: false
+            description: Whether the upload content is encrypted
+            schema:
+                type: boolean
+                default: false
+            explode: false
+        ShareUploadQuery.fileName:
+            name: fileName
+            in: query
+            required: true
+            description: Original file name
+            schema:
+                type: string
+            explode: false
+        ShareUploadQuery.hashing:
+            name: hashing
+            in: query
+            required: false
+            description: Enable BLAKE3 hashing for integrity checking
+            schema:
+                type: boolean
+                default: true
+            explode: false
+        ShareUploadQuery.partNo:
+            name: partNo
+            in: query
+            required: true
+            description: Sequential part number
+            schema:
+                type: integer
             explode: false
         UploadQuery.channelId:
             name: channelId
@@ -2611,6 +2772,7 @@ components:
             required:
                 - id
                 - protected
+                - allowUpload
             properties:
                 id:
                     allOf:
@@ -2625,6 +2787,9 @@ components:
                     type: string
                     format: date-time
                     description: Expiration date and time of the share link
+                allowUpload:
+                    type: boolean
+                    description: Whether recipients can upload files and create folders
             description: Lightweight file sharing information
         FileShareCreate:
             type: object
@@ -2637,6 +2802,9 @@ components:
                     type: string
                     format: date-time
                     description: Share expiration date
+                allowUpload:
+                    type: boolean
+                    description: Allow recipients to upload files and create folders
             description: File share creation request
         FileShareInfo:
             type: object
@@ -2645,6 +2813,8 @@ components:
                 - type
                 - userId
                 - protected
+                - allowUpload
+                - encryptUploads
             properties:
                 name:
                     type: string
@@ -2669,6 +2839,12 @@ components:
                     type: boolean
                     description: Share Protection Status
                     example: false
+                allowUpload:
+                    type: boolean
+                    description: Whether recipients can upload files and create folders
+                encryptUploads:
+                    type: boolean
+                    description: Whether uploads to this share are encrypted by owner policy
         FileUpdate:
             type: object
             properties:
@@ -3070,6 +3246,7 @@ components:
             required:
                 - channelId
                 - bots
+                - encryptFiles
             properties:
                 channelId:
                     type: integer
@@ -3080,12 +3257,23 @@ components:
                     items:
                         type: string
                     description: List of bot tokens
-            description: User configuration for channel and bot settings
+                encryptFiles:
+                    type: boolean
+                    description: Whether files uploaded through writable shares are encrypted
+            description: User configuration for channel, bot, and upload policy settings
             example:
                 channelId: 123456789
                 bots:
                     - bot1
                     - bot2
+                encryptFiles: false
+        UserConfigUpdate:
+            type: object
+            properties:
+                encryptFiles:
+                    type: boolean
+                    description: Whether files uploaded through writable shares are encrypted
+            description: User configuration update
         UserSession:
             type: object
             required:

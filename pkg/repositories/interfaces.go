@@ -91,16 +91,18 @@ type ChannelUpdate struct {
 }
 
 type ShareUpdate struct {
-	Password  *string
-	ExpiresAt *time.Time
-	UpdatedAt *time.Time
+	Password    *string
+	ExpiresAt   *time.Time
+	AllowUpload *bool
+	UpdatedAt   *time.Time
 }
 
 type UserUpdate struct {
-	Name      *string
-	UserName  *string
-	IsPremium *bool
-	UpdatedAt *time.Time
+	Name         *string
+	UserName     *string
+	IsPremium    *bool
+	EncryptFiles *bool
+	UpdatedAt    *time.Time
 }
 
 // FileRepository defines operations for file persistence
@@ -126,6 +128,7 @@ type FileRepository interface {
 	DeletePendingForDeletionByUser(ctx context.Context, userID int64) error
 	DeletePendingForDeletionByIDs(ctx context.Context, fileIDs []uuid.UUID, userID int64) error
 	DeletePendingFoldersByUser(ctx context.Context, userID int64) error
+	IncrementActiveAncestorFolderSizes(ctx context.Context, userID int64, parentID uuid.UUID, delta int64) error
 	RefreshFolderSizesByUser(ctx context.Context, userID int64) error
 	CategoryStats(ctx context.Context, userID int64) ([]CategoryStats, error)
 	DeleteBulk(ctx context.Context, fileIDs []uuid.UUID, userID int64, targetStatus string) error
@@ -158,8 +161,12 @@ type APIKeyRepository interface {
 type UploadRepository interface {
 	Create(ctx context.Context, upload *model.Uploads) error
 	GetByUploadID(ctx context.Context, uploadID string) ([]model.Uploads, error)
+	GetByUploadIDAndUserID(ctx context.Context, uploadID string, userID int64) ([]model.Uploads, error)
 	GetByUploadIDAndRetention(ctx context.Context, uploadID string, retention time.Duration) ([]model.Uploads, error)
+	GetByUploadIDUserIDAndRetention(ctx context.Context, uploadID string, userID int64, retention time.Duration) ([]model.Uploads, error)
+	ConsumeByUploadIDAndUserID(ctx context.Context, uploadID string, userID int64) ([]model.Uploads, error)
 	Delete(ctx context.Context, uploadID string) error
+	DeleteByUploadIDAndUserID(ctx context.Context, uploadID string, userID int64) error
 	ListStale(ctx context.Context, before time.Time) ([]StaleUpload, error)
 	DeleteParts(ctx context.Context, channelID, userID int64, partIDs []int) error
 	DeleteOlderThan(ctx context.Context, before time.Time) (int64, error)
@@ -192,6 +199,7 @@ type BotRepository interface {
 type UserRepository interface {
 	Create(ctx context.Context, user *model.Users) error
 	GetByID(ctx context.Context, userID int64) (*model.Users, error)
+	GetByIDForUpdate(ctx context.Context, userID int64) (*model.Users, error)
 	Update(ctx context.Context, userID int64, update UserUpdate) error
 }
 

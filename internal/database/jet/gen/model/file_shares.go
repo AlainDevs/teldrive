@@ -13,11 +13,12 @@ import (
 )
 
 type FileShares struct {
-	ID        uuid.UUID `sql:"primary_key"`
-	FileID    uuid.UUID
-	Password  *string
-	ExpiresAt *time.Time
-	UserID    int64
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID          uuid.UUID `sql:"primary_key"`
+	FileID      uuid.UUID
+	Password    *string
+	ExpiresAt   *time.Time
+	UserID      int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	AllowUpload bool
 }

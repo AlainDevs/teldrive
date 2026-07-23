@@ -18,38 +18,59 @@ var (
 )
 
 func Parse(header string, size int64) ([]*Range, error) {
-	index := strings.Index(header, "=")
-
-	if index == -1 {
+	unit, values, ok := strings.Cut(strings.TrimSpace(header), "=")
+	if !ok || !strings.EqualFold(strings.TrimSpace(unit), "bytes") || size <= 0 {
 		return nil, ErrInvalid
 	}
 
-	arr := strings.Split(header[index+1:], ",")
+	arr := strings.Split(values, ",")
 	ranges := make([]*Range, 0, len(arr))
 
 	for _, value := range arr {
-		r := strings.Split(value, "-")
-		start, startErr := strconv.ParseInt(r[0], 10, 64)
-		end, endErr := strconv.ParseInt(r[1], 10, 64)
-
-		if startErr != nil && endErr != nil {
-			continue
+		startValue, endValue, ok := strings.Cut(strings.TrimSpace(value), "-")
+		if !ok || strings.Contains(endValue, "-") {
+			return nil, ErrInvalid
+		}
+		startValue = strings.TrimSpace(startValue)
+		endValue = strings.TrimSpace(endValue)
+		if startValue == "" && endValue == "" {
+			return nil, ErrInvalid
 		}
 
-		// -nnn and nnn-
-		if startErr != nil {
+		var start, end int64
+		if startValue == "" {
+			var err error
+			end, err = strconv.ParseInt(endValue, 10, 64)
+			if err != nil || end <= 0 {
+				return nil, ErrInvalid
+			}
+			if end > size {
+				end = size
+			}
 			start = size - end
 			end = size - 1
-		} else if endErr != nil {
-			end = size - 1
+		} else {
+			var err error
+			start, err = strconv.ParseInt(startValue, 10, 64)
+			if err != nil || start < 0 {
+				return nil, ErrInvalid
+			}
+			if endValue == "" {
+				end = size - 1
+			} else {
+				end, err = strconv.ParseInt(endValue, 10, 64)
+				if err != nil || end < 0 || start > end {
+					return nil, ErrInvalid
+				}
+			}
 		}
 
 		if end >= size {
 			end = size - 1
 		}
 
-		if start > end || start < 0 {
-			continue
+		if start >= size {
+			return nil, ErrNoOverlap
 		}
 
 		ranges = append(ranges, &Range{

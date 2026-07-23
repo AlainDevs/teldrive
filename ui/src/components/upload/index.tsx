@@ -11,15 +11,18 @@ import IconParkOutlineDownC from "~icons/icon-park-outline/down-c";
 
 import { $api } from "@/utils/api";
 import { filesize } from "@/utils/common";
-import { useSession } from "@/utils/query-options";
 import { FileUploadStatus, useFileUploadStore } from "@/utils/stores";
 import { useSettingsStore } from "@/utils/stores/settings";
-import { useSearch } from "@tanstack/react-router";
 import type { UploadProps } from "./types";
+import { resolveUploadEncryption } from "./encryption";
 import { uploadFile } from "./upload-file";
 import { UploadFileEntry } from "./upload-file-entry";
 
-export const Upload = ({ queryKey }: UploadProps) => {
+type DirectoryInputProps = React.ComponentProps<"input"> & {
+  webkitdirectory: string;
+};
+
+export const Upload = ({ queryKey, mode = "drive", shareId, path = "/", userId = 0, encryptFiles }: UploadProps) => {
   const {
     fileIds,
     currentFile,
@@ -110,8 +113,6 @@ export const Upload = ({ queryKey }: UploadProps) => {
 
   const { settings } = useSettingsStore();
 
-  const [session] = useSession();
-
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
@@ -192,7 +193,15 @@ export const Upload = ({ queryKey }: UploadProps) => {
       queryClient.invalidateQueries({ queryKey });
     },
   });
-  const { path } = useSearch({ from: "/_authed/$view" });
+  const createShareFile = $api.useMutation("post", "/shares/{id}/files", {
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
+  const uploadPath = path || "/";
+
+  const effectiveEncryptFiles = resolveUploadEncryption(encryptFiles, Boolean(settings.encryptFiles));
 
   useEffect(() => {
     if (
@@ -201,16 +210,32 @@ export const Upload = ({ queryKey }: UploadProps) => {
     ) {
       if (currentFile.isFolder) {
         actions.setFileUploadStatus(currentFile.id, FileUploadStatus.UPLOADING);
-        creatFile
-          .mutateAsync({
+        const body = {
+          name: currentFile.file.name,
+          path: currentFile.relativePath
+            ? `${uploadPath}/${currentFile.relativePath.split("/").slice(0, -1).join("/")}`
+            : uploadPath,
+          type: "folder" as const,
+        };
+        const request = mode === "share" && shareId
+          ? createShareFile.mutateAsync({
+            body,
+            params: {
+              path: {
+                id: shareId,
+              },
+            },
+          })
+          : creatFile.mutateAsync({
             body: {
               name: currentFile.file.name,
               path: currentFile.relativePath
-                ? `${path || "/"}/${currentFile.relativePath.split("/").slice(0, -1).join("/")}`
-                : path || "/",
+                ? `${uploadPath}/${currentFile.relativePath.split("/").slice(0, -1).join("/")}`
+                : uploadPath,
               type: "folder",
             },
-          })
+          });
+        request
           .then(() => {
             actions.setFileUploadStatus(
               currentFile.id,
@@ -240,30 +265,40 @@ export const Upload = ({ queryKey }: UploadProps) => {
         uploadFile(
           currentFile.file,
           currentFile.parentFolderId
-            ? `${path || "/"}/${currentFile.relativePath?.split("/").slice(0, -1).join("/")}`
-            : path || "/",
+            ? `${uploadPath}/${currentFile.relativePath?.split("/").slice(0, -1).join("/")}`
+            : uploadPath,
           Number(settings.splitFileSize),
-          session?.userId as number,
+          userId,
           Number(settings.uploadConcurrency),
           Number(settings.uploadRetries),
           Number(settings.uploadRetryDelay),
-          Boolean(settings.encryptFiles),
+          effectiveEncryptFiles,
           Boolean(settings.randomChunking),
           currentFile.controller.signal,
           (progress) => actions.setProgress(currentFile.id, progress),
           (chunks) => actions.setChunksCompleted(currentFile.id, chunks),
           async (payload) => {
-            await creatFile.mutateAsync({
-              body: payload,
-            });
-            if (creatFile.isSuccess) {
-              actions.setFileUploadStatus(
-                currentFile.id,
-                FileUploadStatus.UPLOADED,
-              );
+            if (mode === "share" && shareId) {
+              await createShareFile.mutateAsync({
+                body: payload,
+                params: {
+                  path: {
+                    id: shareId,
+                  },
+                },
+              });
+            } else {
+              await creatFile.mutateAsync({
+                body: payload,
+              });
             }
+            actions.setFileUploadStatus(
+              currentFile.id,
+              FileUploadStatus.UPLOADED,
+            );
           },
           currentFile.parentFolderId !== undefined, // Skip check for folder files
+          { shareId: mode === "share" ? shareId : undefined },
         )
           .then(() => {
             if (currentFile.status !== FileUploadStatus.SKIPPED) {
@@ -298,24 +333,29 @@ export const Upload = ({ queryKey }: UploadProps) => {
           });
       }
     }
-  }, [currentFile?.id, currentFile?.status]);
+  }, [currentFile?.id, currentFile?.status, mode, path, shareId, effectiveEncryptFiles]);
+
+  const folderInputProps: DirectoryInputProps = {
+    "aria-label": "Upload folder",
+    className: "opacity-0 size-0",
+    multiple: true,
+    onChange: handleFolderChange,
+    ref: folderInputRef,
+    type: "file",
+    webkitdirectory: "",
+  };
 
   return (
     <div className="fixed bottom-4 right-4 z-50 max-w-sm">
       <input
+        aria-label="Upload files"
         className="opacity-0 size-0"
         ref={fileInputRef}
         type="file"
         multiple
         onChange={handleFileChange}
       />
-      <input
-        className="opacity-0 size-0"
-        ref={folderInputRef}
-        type="file"
-        {...({ webkitdirectory: "" } as any)}
-        onChange={handleFolderChange}
-      />
+      <input {...folderInputProps} />
       {fileIds.length > 0 && (
         <div className="relative w-96 shadow-2xl rounded-xl overflow-hidden bg-surface-secondary border border-border/10">
           <div
@@ -395,6 +435,7 @@ export const Upload = ({ queryKey }: UploadProps) => {
                     <ListBox.Item
                       className="px-0"
                       id={id}
+                      key={id}
                       textValue={id}
                     >
                       <UploadFileEntry

@@ -237,6 +237,95 @@ func TestFolderSizeRefresh_MoveAndBulkCases(t *testing.T) {
 	assertFolderSize(t, fileRepo, ctx, uid1, *root1ID, 40)
 }
 
+func TestIncrementActiveAncestorFolderSizesScopesToActiveUserFolders(t *testing.T) {
+	s := newHarness(t)
+	ctx := context.Background()
+	uid1 := int64(7612)
+	uid2 := int64(7613)
+
+	fileRepo := repositories.NewJetFileRepository(s.pool)
+
+	active := "active"
+	pending := "pending_deletion"
+	now := time.Now().UTC()
+
+	root1ID, err := fileRepo.CreateDirectories(ctx, uid1, "/root")
+	if err != nil {
+		t.Fatalf("create user1 root: %v", err)
+	}
+	activeParentID, err := fileRepo.CreateDirectories(ctx, uid1, "/root/active-parent")
+	if err != nil {
+		t.Fatalf("create active parent: %v", err)
+	}
+	otherUserRootID, err := fileRepo.CreateDirectories(ctx, uid2, "/root")
+	if err != nil {
+		t.Fatalf("create user2 root: %v", err)
+	}
+
+	pendingParentID := uuid.New()
+	if err := fileRepo.Create(ctx, &jetmodel.Files{
+		ID:        pendingParentID,
+		Name:      "pending-parent",
+		Type:      "folder",
+		MimeType:  "drive/folder",
+		UserID:    uid1,
+		ParentID:  root1ID,
+		Status:    &pending,
+		Encrypted: false,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("create pending parent: %v", err)
+	}
+
+	fileAsParentID := uuid.New()
+	fileSize := int64(99)
+	if err := fileRepo.Create(ctx, &jetmodel.Files{
+		ID:        fileAsParentID,
+		Name:      "file-as-parent.txt",
+		Type:      "file",
+		MimeType:  "text/plain",
+		UserID:    uid1,
+		ParentID:  root1ID,
+		Status:    &active,
+		Size:      &fileSize,
+		Encrypted: false,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}); err != nil {
+		t.Fatalf("create file-as-parent: %v", err)
+	}
+
+	if err := fileRepo.IncrementActiveAncestorFolderSizes(ctx, uid1, *activeParentID, 17); err != nil {
+		t.Fatalf("increment active ancestors: %v", err)
+	}
+	assertFolderSizeNoRefresh(t, fileRepo, ctx, *activeParentID, 17)
+	assertFolderSizeNoRefresh(t, fileRepo, ctx, *root1ID, 17)
+	assertFolderSizeNoRefresh(t, fileRepo, ctx, *otherUserRootID, 0)
+
+	if err := fileRepo.IncrementActiveAncestorFolderSizes(ctx, uid2, *activeParentID, 11); err != nil {
+		t.Fatalf("increment wrong user ancestors: %v", err)
+	}
+	assertFolderSizeNoRefresh(t, fileRepo, ctx, *activeParentID, 17)
+	assertFolderSizeNoRefresh(t, fileRepo, ctx, *root1ID, 17)
+	assertFolderSizeNoRefresh(t, fileRepo, ctx, *otherUserRootID, 0)
+
+	if err := fileRepo.IncrementActiveAncestorFolderSizes(ctx, uid1, pendingParentID, 13); err != nil {
+		t.Fatalf("increment pending parent ancestors: %v", err)
+	}
+	if err := fileRepo.Update(ctx, pendingParentID, repositories.FileUpdate{Status: &active}); err != nil {
+		t.Fatalf("reactivate pending parent for size assertion: %v", err)
+	}
+	assertFolderSizeNoRefresh(t, fileRepo, ctx, pendingParentID, 0)
+	assertFolderSizeNoRefresh(t, fileRepo, ctx, *root1ID, 17)
+
+	if err := fileRepo.IncrementActiveAncestorFolderSizes(ctx, uid1, fileAsParentID, 19); err != nil {
+		t.Fatalf("increment file parent ancestors: %v", err)
+	}
+	assertFolderSizeNoRefresh(t, fileRepo, ctx, fileAsParentID, fileSize)
+	assertFolderSizeNoRefresh(t, fileRepo, ctx, *root1ID, 17)
+}
+
 func assertFolderSize(t *testing.T, repo repositories.FileRepository, ctx context.Context, userID int64, folderID uuid.UUID, expected int64) {
 	t.Helper()
 	if err := repo.RefreshFolderSizesByUser(ctx, userID); err != nil {
@@ -252,5 +341,20 @@ func assertFolderSize(t *testing.T, repo repositories.FileRepository, ctx contex
 	}
 	if actual != expected {
 		t.Fatalf("folder %s size mismatch: got %d want %d", folderID, actual, expected)
+	}
+}
+
+func assertFolderSizeNoRefresh(t *testing.T, repo repositories.FileRepository, ctx context.Context, folderID uuid.UUID, expected int64) {
+	t.Helper()
+	row, err := repo.GetByID(ctx, folderID)
+	if err != nil {
+		t.Fatalf("get folder %s: %v", folderID, err)
+	}
+	var actual int64
+	if row.Size != nil {
+		actual = *row.Size
+	}
+	if actual != expected {
+		t.Fatalf("folder %s size mismatch without refresh: got %d want %d", folderID, actual, expected)
 	}
 }

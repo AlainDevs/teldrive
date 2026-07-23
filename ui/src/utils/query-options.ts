@@ -53,7 +53,7 @@ export const fileQueries = {
 export const shareQueries = {
   list: (params: ShareListParams) =>
     infiniteQueryOptions({
-      getNextPageParam: (lastPage) => lastPage?.meta.nextCursor || undefined,
+      getNextPageParam: (lastPage) => (lastPage as components["schemas"]["FileList"] | undefined)?.meta.nextCursor || undefined,
       initialPageParam: undefined as string | undefined,
       queryFn: async ({ pageParam, signal }) =>
         (
@@ -67,10 +67,13 @@ export const shareQueries = {
             },
             signal,
           })
-        ).data,
+        ).data as components["schemas"]["FileList"] | undefined,
       queryKey: ["Shares_listFiles", params],
       select: (data) =>
-        data.pages.flatMap((page) => (page?.items ? mapFilesToFb(page?.items, "") : [])),
+        data.pages.flatMap((page) => {
+          const fileList = page as components["schemas"]["FileList"] | undefined;
+          return fileList?.items ? mapFilesToFb(fileList.items, "") : [];
+        }),
     }),
 };
 

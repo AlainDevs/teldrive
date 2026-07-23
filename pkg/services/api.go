@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/go-faster/errors"
@@ -25,6 +26,12 @@ import (
 	"github.com/tgdrive/teldrive/pkg/mapper"
 	"github.com/tgdrive/teldrive/pkg/repositories"
 	"github.com/tgdrive/teldrive/pkg/worker"
+	"golang.org/x/time/rate"
+)
+
+const (
+	shareUploadLimiterMaxEntries = 4096
+	shareUploadLimiterTTL        = 10 * time.Minute
 )
 
 type apiService struct {
@@ -33,10 +40,66 @@ type apiService struct {
 	varcCache      *varc.Cache
 	events         events.EventBroadcaster
 	authAttempts   *authAttemptManager
+	shareLimiters  *shareUploadLimiterStore
 	channelManager ChannelManager
 	telegram       TelegramService
 	repo           *repositories.Repositories
 	workerStore    *worker.Store
+}
+
+type shareUploadLimiterStore struct {
+	mu       sync.Mutex
+	limiters map[string]*shareUploadLimiter
+	sweeps   int
+}
+
+type shareUploadLimiter struct {
+	limiter  *rate.Limiter
+	lastSeen time.Time
+}
+
+func newShareUploadLimiterStore() *shareUploadLimiterStore {
+	return &shareUploadLimiterStore{limiters: make(map[string]*shareUploadLimiter)}
+}
+
+func (s *shareUploadLimiterStore) allow(shareID string, every time.Duration, burst int, now time.Time) bool {
+	if burst <= 0 {
+		burst = 1
+	}
+	if every <= 0 {
+		every = time.Millisecond
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	entry := s.limiters[shareID]
+	if entry == nil {
+		entry = &shareUploadLimiter{limiter: rate.NewLimiter(rate.Every(every), burst)}
+		s.limiters[shareID] = entry
+	}
+	entry.lastSeen = now
+	s.sweeps++
+	if len(s.limiters) > shareUploadLimiterMaxEntries || s.sweeps >= shareUploadLimiterMaxEntries {
+		s.cleanupLocked(now)
+	}
+	return entry.limiter.AllowN(now, 1)
+}
+
+func (s *shareUploadLimiterStore) cleanupLocked(now time.Time) {
+	cutoff := now.Add(-shareUploadLimiterTTL)
+	for key, entry := range s.limiters {
+		if entry.lastSeen.Before(cutoff) {
+			delete(s.limiters, key)
+		}
+	}
+	for key := range s.limiters {
+		if len(s.limiters) <= shareUploadLimiterMaxEntries {
+			break
+		}
+		delete(s.limiters, key)
+	}
+	s.sweeps = 0
 }
 
 func (a *apiService) VersionVersion(ctx context.Context) (*api.ApiVersion, error) {
@@ -173,6 +236,7 @@ func NewApiService(repo *repositories.Repositories,
 		varcCache:      varcCache,
 		events:         events,
 		authAttempts:   newAuthAttemptManager(),
+		shareLimiters:  newShareUploadLimiterStore(),
 		channelManager: channelManager,
 		telegram:       telegram,
 		workerStore:    workerStore,

@@ -70,6 +70,23 @@ func TestUserUpdate(t *testing.T) {
 	if !got.IsPremium {
 		t.Errorf("IsPremium not updated: got false, want true")
 	}
+	if got.EncryptFiles {
+		t.Errorf("EncryptFiles default: got true, want false")
+	}
+
+	encryptFiles := true
+	err = userRepo.Update(ctx, uid, repositories.UserUpdate{EncryptFiles: &encryptFiles})
+	if err != nil {
+		t.Fatalf("Update EncryptFiles failed: %v", err)
+	}
+
+	got, err = userRepo.GetByID(ctx, uid)
+	if err != nil {
+		t.Fatalf("GetByID after EncryptFiles update failed: %v", err)
+	}
+	if !got.EncryptFiles {
+		t.Errorf("EncryptFiles not updated: got false, want true")
+	}
 }
 
 func TestUserExists(t *testing.T) {

@@ -17,4 +17,13 @@ export type UploadParams = Record<
 
 export interface UploadProps {
   queryKey: any[];
+  mode?: "drive" | "share";
+  shareId?: string;
+  path?: string;
+  userId?: number;
+  encryptFiles?: boolean;
+}
+
+export interface UploadFileOptions {
+  shareId?: string;
 }

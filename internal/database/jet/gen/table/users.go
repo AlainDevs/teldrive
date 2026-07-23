@@ -17,12 +17,13 @@ type usersTable struct {
 	postgres.Table
 
 	// Columns
-	UserID    postgres.ColumnInteger
-	Name      postgres.ColumnString
-	UserName  postgres.ColumnString
-	IsPremium postgres.ColumnBool
-	CreatedAt postgres.ColumnTimestampz
-	UpdatedAt postgres.ColumnTimestampz
+	UserID       postgres.ColumnInteger
+	Name         postgres.ColumnString
+	UserName     postgres.ColumnString
+	IsPremium    postgres.ColumnBool
+	CreatedAt    postgres.ColumnTimestampz
+	UpdatedAt    postgres.ColumnTimestampz
+	EncryptFiles postgres.ColumnBool
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
@@ -64,27 +65,29 @@ func newUsersTable(schemaName, tableName, alias string) *UsersTable {
 
 func newUsersTableImpl(schemaName, tableName, alias string) usersTable {
 	var (
-		UserIDColumn    = postgres.IntegerColumn("user_id")
-		NameColumn      = postgres.StringColumn("name")
-		UserNameColumn  = postgres.StringColumn("user_name")
-		IsPremiumColumn = postgres.BoolColumn("is_premium")
-		CreatedAtColumn = postgres.TimestampzColumn("created_at")
-		UpdatedAtColumn = postgres.TimestampzColumn("updated_at")
-		allColumns      = postgres.ColumnList{UserIDColumn, NameColumn, UserNameColumn, IsPremiumColumn, CreatedAtColumn, UpdatedAtColumn}
-		mutableColumns  = postgres.ColumnList{NameColumn, UserNameColumn, IsPremiumColumn, CreatedAtColumn, UpdatedAtColumn}
-		defaultColumns  = postgres.ColumnList{CreatedAtColumn, UpdatedAtColumn}
+		UserIDColumn       = postgres.IntegerColumn("user_id")
+		NameColumn         = postgres.StringColumn("name")
+		UserNameColumn     = postgres.StringColumn("user_name")
+		IsPremiumColumn    = postgres.BoolColumn("is_premium")
+		CreatedAtColumn    = postgres.TimestampzColumn("created_at")
+		UpdatedAtColumn    = postgres.TimestampzColumn("updated_at")
+		EncryptFilesColumn = postgres.BoolColumn("encrypt_files")
+		allColumns         = postgres.ColumnList{UserIDColumn, NameColumn, UserNameColumn, IsPremiumColumn, CreatedAtColumn, UpdatedAtColumn, EncryptFilesColumn}
+		mutableColumns     = postgres.ColumnList{NameColumn, UserNameColumn, IsPremiumColumn, CreatedAtColumn, UpdatedAtColumn, EncryptFilesColumn}
+		defaultColumns     = postgres.ColumnList{CreatedAtColumn, UpdatedAtColumn, EncryptFilesColumn}
 	)
 
 	return usersTable{
 		Table: postgres.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		UserID:    UserIDColumn,
-		Name:      NameColumn,
-		UserName:  UserNameColumn,
-		IsPremium: IsPremiumColumn,
-		CreatedAt: CreatedAtColumn,
-		UpdatedAt: UpdatedAtColumn,
+		UserID:       UserIDColumn,
+		Name:         NameColumn,
+		UserName:     UserNameColumn,
+		IsPremium:    IsPremiumColumn,
+		CreatedAt:    CreatedAtColumn,
+		UpdatedAt:    UpdatedAtColumn,
+		EncryptFiles: EncryptFilesColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

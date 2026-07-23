@@ -35,14 +35,15 @@ type shareTokenClaims struct {
 }
 
 type fileShare struct {
-	ID        string
-	FileID    string
-	Password  *string
-	ExpiresAt *time.Time
-	UserID    int64
-	Type      api.FileShareInfoType
-	Name      string
-	Path      string
+	ID          string
+	FileID      string
+	Password    *string
+	ExpiresAt   *time.Time
+	UserID      int64
+	Type        api.FileShareInfoType
+	Name        string
+	Path        string
+	AllowUpload bool
 }
 
 func (a *apiService) shareGetById(ctx context.Context, shareID uuid.UUID) (*fileShare, error) {
@@ -63,14 +64,15 @@ func (a *apiService) shareGetById(ctx context.Context, shareID uuid.UUID) (*file
 	}
 
 	return &fileShare{
-		ID:        share.ID.String(),
-		FileID:    share.FileID.String(),
-		Password:  share.Password,
-		ExpiresAt: share.ExpiresAt,
-		UserID:    share.UserID,
-		Type:      api.FileShareInfoType(file.Type),
-		Name:      file.Name,
-		Path:      path,
+		ID:          share.ID.String(),
+		FileID:      share.FileID.String(),
+		Password:    share.Password,
+		ExpiresAt:   share.ExpiresAt,
+		UserID:      share.UserID,
+		Type:        api.FileShareInfoType(file.Type),
+		Name:        file.Name,
+		Path:        path,
+		AllowUpload: share.AllowUpload,
 	}, nil
 }
 
@@ -80,16 +82,30 @@ func (a *apiService) SharesGetById(ctx context.Context, params api.SharesGetById
 	if err != nil {
 		return nil, err
 	}
+	encryptUploads, err := a.userEncryptFiles(ctx, share.UserID)
+	if err != nil {
+		return nil, err
+	}
 	res := &api.FileShareInfo{
-		Protected: share.Password != nil,
-		UserId:    share.UserID,
-		Type:      share.Type,
-		Name:      share.Name,
+		Protected:      share.Password != nil,
+		UserId:         share.UserID,
+		Type:           share.Type,
+		Name:           share.Name,
+		AllowUpload:    share.AllowUpload,
+		EncryptUploads: encryptUploads,
 	}
 	if share.ExpiresAt != nil {
 		res.ExpiresAt = api.NewOptDateTime(*share.ExpiresAt)
 	}
 	return res, nil
+}
+
+func (a *apiService) userEncryptFiles(ctx context.Context, userID int64) (bool, error) {
+	user, err := a.repo.Users.GetByID(ctx, userID)
+	if err != nil {
+		return false, &apiError{err: err}
+	}
+	return user.EncryptFiles, nil
 }
 
 func (a *apiService) issueShareToken(share *jetmodel.FileShares) (string, time.Time, error) {
@@ -229,6 +245,10 @@ func (a *apiService) validFileShare(ctx context.Context, id uuid.UUID, shareToke
 	})
 
 	if err != nil {
+		var apiErr *apiError
+		if errors.As(err, &apiErr) {
+			return nil, err
+		}
 		return nil, &apiError{err: err}
 	}
 

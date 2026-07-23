@@ -17,13 +17,14 @@ type fileSharesTable struct {
 	postgres.Table
 
 	// Columns
-	ID        postgres.ColumnString
-	FileID    postgres.ColumnString
-	Password  postgres.ColumnString
-	ExpiresAt postgres.ColumnTimestamp
-	UserID    postgres.ColumnInteger
-	CreatedAt postgres.ColumnTimestamp
-	UpdatedAt postgres.ColumnTimestamp
+	ID          postgres.ColumnString
+	FileID      postgres.ColumnString
+	Password    postgres.ColumnString
+	ExpiresAt   postgres.ColumnTimestamp
+	UserID      postgres.ColumnInteger
+	CreatedAt   postgres.ColumnTimestamp
+	UpdatedAt   postgres.ColumnTimestamp
+	AllowUpload postgres.ColumnBool
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
@@ -65,29 +66,31 @@ func newFileSharesTable(schemaName, tableName, alias string) *FileSharesTable {
 
 func newFileSharesTableImpl(schemaName, tableName, alias string) fileSharesTable {
 	var (
-		IDColumn        = postgres.StringColumn("id")
-		FileIDColumn    = postgres.StringColumn("file_id")
-		PasswordColumn  = postgres.StringColumn("password")
-		ExpiresAtColumn = postgres.TimestampColumn("expires_at")
-		UserIDColumn    = postgres.IntegerColumn("user_id")
-		CreatedAtColumn = postgres.TimestampColumn("created_at")
-		UpdatedAtColumn = postgres.TimestampColumn("updated_at")
-		allColumns      = postgres.ColumnList{IDColumn, FileIDColumn, PasswordColumn, ExpiresAtColumn, UserIDColumn, CreatedAtColumn, UpdatedAtColumn}
-		mutableColumns  = postgres.ColumnList{FileIDColumn, PasswordColumn, ExpiresAtColumn, UserIDColumn, CreatedAtColumn, UpdatedAtColumn}
-		defaultColumns  = postgres.ColumnList{IDColumn, CreatedAtColumn, UpdatedAtColumn}
+		IDColumn          = postgres.StringColumn("id")
+		FileIDColumn      = postgres.StringColumn("file_id")
+		PasswordColumn    = postgres.StringColumn("password")
+		ExpiresAtColumn   = postgres.TimestampColumn("expires_at")
+		UserIDColumn      = postgres.IntegerColumn("user_id")
+		CreatedAtColumn   = postgres.TimestampColumn("created_at")
+		UpdatedAtColumn   = postgres.TimestampColumn("updated_at")
+		AllowUploadColumn = postgres.BoolColumn("allow_upload")
+		allColumns        = postgres.ColumnList{IDColumn, FileIDColumn, PasswordColumn, ExpiresAtColumn, UserIDColumn, CreatedAtColumn, UpdatedAtColumn, AllowUploadColumn}
+		mutableColumns    = postgres.ColumnList{FileIDColumn, PasswordColumn, ExpiresAtColumn, UserIDColumn, CreatedAtColumn, UpdatedAtColumn, AllowUploadColumn}
+		defaultColumns    = postgres.ColumnList{IDColumn, CreatedAtColumn, UpdatedAtColumn, AllowUploadColumn}
 	)
 
 	return fileSharesTable{
 		Table: postgres.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		ID:        IDColumn,
-		FileID:    FileIDColumn,
-		Password:  PasswordColumn,
-		ExpiresAt: ExpiresAtColumn,
-		UserID:    UserIDColumn,
-		CreatedAt: CreatedAtColumn,
-		UpdatedAt: UpdatedAtColumn,
+		ID:          IDColumn,
+		FileID:      FileIDColumn,
+		Password:    PasswordColumn,
+		ExpiresAt:   ExpiresAtColumn,
+		UserID:      UserIDColumn,
+		CreatedAt:   CreatedAtColumn,
+		UpdatedAt:   UpdatedAtColumn,
+		AllowUpload: AllowUploadColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

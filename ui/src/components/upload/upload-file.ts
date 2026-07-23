@@ -5,17 +5,27 @@ import pLimit from "p-limit";
 import type { components } from "@/lib/api";
 import { fetchClient } from "@/utils/api";
 import { formatTime, zeroPad } from "@/utils/common";
-import type { UploadParams } from "./types";
+import type { UploadFileOptions, UploadParams } from "./types";
 
 
 function generateUUID(): string {
-  // Check if crypto.randomUUID is available and call it to generate a UUID
-  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
-      return crypto.randomUUID();
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    return window.crypto.randomUUID();
   }
 
-  // Fallback to Date.now() if crypto.randomUUID is not available
-  return Date.now().toString();
+  if (window.crypto && typeof window.crypto.getRandomValues === "function") {
+    const randomValues = window.crypto.getRandomValues(new Uint8Array(16));
+    randomValues[6] = (randomValues[6] & 0x0f) | 0x40;
+    randomValues[8] = (randomValues[8] & 0x3f) | 0x80;
+
+    const hex = Array.from(randomValues, (value) =>
+      value.toString(16).padStart(2, "0"),
+    ).join("");
+
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+
+  return md5(`${Date.now()}-${performance.now()}-${Math.random()}`);
 }
 
 
@@ -38,24 +48,33 @@ export const uploadChunk = <T extends {}>(
     signal.addEventListener("abort", () => xhr.abort());
 
     xhr.open("POST", uploadUrl.href, true);
+    xhr.withCredentials = true;
     xhr.setRequestHeader("Content-Type", "application/octet-stream");
 
     xhr.responseType = "json";
 
-    xhr.upload.onprogress = (event) =>
-      event.lengthComputable && onProgress((event.loaded / event.total) * 100);
+    xhr.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable) {
+        onProgress((event.loaded / event.total) * 100);
+      }
+    });
 
-    xhr.onload = () => {
+    xhr.addEventListener("load", () => {
+      if (xhr.status < 200 || xhr.status >= 300) {
+        const message = xhr.response?.message || xhr.statusText || "upload failed";
+        reject(new Error(message));
+        return;
+      }
       onProgress(100);
       resolve(xhr.response as T);
-    };
+    });
 
-    xhr.onabort = () => {
+    xhr.addEventListener("abort", () => {
       reject(new Error("upload aborted"));
-    };
-    xhr.onerror = () => {
+    });
+    xhr.addEventListener("error", () => {
       reject(new Error("upload failed"));
-    };
+    });
     xhr.send(body);
   });
 
@@ -74,10 +93,11 @@ export const uploadFile = async (
   onChunksCompleted: (chunks: number) => void,
   onCreate: (payload: components["schemas"]["File"]) => Promise<void>,
   skipCheck = false,
+  options: UploadFileOptions = {},
 ) => {
   const fileName = file.name;
 
-  if (!skipCheck) {
+  if (!skipCheck && !options.shareId) {
     const res = (
       await fetchClient.GET("/files", {
         params: {
@@ -95,21 +115,27 @@ export const uploadFile = async (
 
   const limit = pLimit(concurrency);
 
-  const uploadId = md5(
-    `${path}/${fileName}${file.size.toString()}${formatTime(file.lastModified)}${userId}`,
-  );
+  const uploadId = options.shareId
+    ? generateUUID()
+    : md5(
+      `${path}/${fileName}${file.size.toString()}${formatTime(file.lastModified)}${userId}`,
+    );
 
-  const url = `${window.location.origin}/api/uploads/${uploadId}`;
+  const url = options.shareId
+    ? `${window.location.origin}/api/shares/${options.shareId}/uploads/${uploadId}`
+    : `${window.location.origin}/api/uploads/${uploadId}`;
 
-  const uploadedParts = (
-    await fetchClient.GET("/uploads/{id}", {
-      params: {
-        path: {
-          id: uploadId,
+  const uploadedParts = options.shareId
+    ? []
+    : (
+      await fetchClient.GET("/uploads/{id}", {
+        params: {
+          path: {
+            id: uploadId,
+          },
         },
-      },
-    })
-  ).data!;
+      })
+    ).data!;
 
   let channelId = 0;
 
@@ -144,13 +170,19 @@ export const uploadFile = async (
               ? `${fileName}.part.${zeroPad(partIndex + 1, 3)}`
               : fileName);
 
-          const params = {
-            channelId,
-            encrypted: encyptFile,
-            fileName,
-            partName,
-            partNo: partIndex + 1,
-          } as const;
+          const params = options.shareId
+            ? {
+              encrypted: encyptFile,
+              fileName,
+              partNo: partIndex + 1,
+            } as const
+            : {
+              channelId,
+              encrypted: encyptFile,
+              fileName,
+              partName,
+              partNo: partIndex + 1,
+            } as const;
 
           let retryCount = 0;
           let asset: components["schemas"]["UploadPart"] | null = null;
@@ -209,25 +241,36 @@ export const uploadFile = async (
       .toSorted((a, b) => a.partNo - b.partNo)
       .map((item) => ({ id: item.partId, salt: item.salt }));
 
-    const payload = {
-      channelId,
+    const basePayload = {
       encrypted: encyptFile,
       mimeType: file.type ?? "application/octet-stream",
       name: fileName,
-      parts: uploadParts,
       path: path ? path : "/",
       size: file.size,
       type: "file",
     } as const;
 
+    const payload = options.shareId
+      ? {
+        ...basePayload,
+        uploadId,
+      } as const
+      : {
+        ...basePayload,
+        channelId,
+        parts: uploadParts,
+      } as const;
+
     await onCreate(payload);
-    await fetchClient.DELETE("/uploads/{id}", {
-      params: {
-        path: {
-          id: uploadId,
+    if (!options.shareId) {
+      await fetchClient.DELETE("/uploads/{id}", {
+        params: {
+          path: {
+            id: uploadId,
+          },
         },
-      },
-    });
+      });
+    }
     clearInterval(timer);
   } catch (error) {
     clearInterval(timer);
