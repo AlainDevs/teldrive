@@ -461,19 +461,26 @@ func (r *JetFileRepository) GetFullPath(ctx context.Context, fileID uuid.UUID) (
 }
 
 func (r *JetFileRepository) ListPendingForDeletion(ctx context.Context) ([]PendingFile, error) {
-	stmt := table.Files.
-		SELECT(table.Files.ID, table.Files.Parts, table.Files.ChannelID, table.Files.UserID).
-		FROM(table.Files).
-		WHERE(table.Files.Type.EQ(postgres.String("file")).AND(table.Files.Status.EQ(postgres.String("pending_deletion"))))
-
-	var out []PendingFile
-	if err := r.db.query(ctx, stmt, &out); err != nil {
-		if errors.Is(err, qrm.ErrNoRows) {
-			return []PendingFile{}, nil
-		}
-		return nil, err
+	rows, err := r.db.raw().Query(ctx, `
+		SELECT id, parts::text, channel_id, user_id
+		FROM files
+		WHERE type = 'file' AND status = 'pending_deletion'
+	`)
+	if err != nil {
+		return nil, normalizeDBError(err)
 	}
-
+	defer rows.Close()
+	out := make([]PendingFile, 0)
+	for rows.Next() {
+		var row PendingFile
+		if err := rows.Scan(&row.ID, &row.Parts, &row.ChannelID, &row.UserID); err != nil {
+			return nil, normalizeDBError(err)
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, normalizeDBError(err)
+	}
 	return out, nil
 }
 
@@ -482,6 +489,31 @@ func (r *JetFileRepository) DeletePendingForDeletionByUser(ctx context.Context, 
 		table.Files.UserID.EQ(postgres.Int64(userID)).AND(table.Files.Status.EQ(postgres.String("pending_deletion"))),
 	)
 
+	return r.db.exec(ctx, stmt)
+}
+
+func (r *JetFileRepository) DeletePendingForDeletionByIDs(ctx context.Context, fileIDs []uuid.UUID, userID int64) error {
+	if len(fileIDs) == 0 {
+		return nil
+	}
+	idExprs := make([]postgres.Expression, 0, len(fileIDs))
+	for _, id := range fileIDs {
+		idExprs = append(idExprs, postgres.UUID(id))
+	}
+	stmt := table.Files.DELETE().WHERE(
+		table.Files.ID.IN(idExprs...).
+			AND(table.Files.UserID.EQ(postgres.Int64(userID))).
+			AND(table.Files.Status.EQ(postgres.String("pending_deletion"))),
+	)
+	return r.db.exec(ctx, stmt)
+}
+
+func (r *JetFileRepository) DeletePendingFoldersByUser(ctx context.Context, userID int64) error {
+	stmt := table.Files.DELETE().WHERE(
+		table.Files.UserID.EQ(postgres.Int64(userID)).
+			AND(table.Files.Type.EQ(postgres.String("folder"))).
+			AND(table.Files.Status.EQ(postgres.String("pending_deletion"))),
+	)
 	return r.db.exec(ctx, stmt)
 }
 
@@ -623,7 +655,8 @@ func (r *JetFileRepository) DeleteBulkReturning(ctx context.Context, fileIDs []u
 					postgres.SELECT(table.Files.ID).
 						FROM(
 							table.Files.INNER_JOIN(subtree, table.Files.ParentID.EQ(subtreeID.From(subtree))),
-						),
+						).
+						WHERE(table.Files.UserID.EQ(postgres.Int64(userID))),
 				),
 		),
 	)(

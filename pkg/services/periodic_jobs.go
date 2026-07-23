@@ -245,6 +245,20 @@ func (a *apiService) ensureDefaultPeriodicJobs(ctx context.Context, userID int64
 	return nil
 }
 
+func (a *apiService) schedulePendingFileCleanup(ctx context.Context, userID int64) error {
+	if a.workerStore == nil {
+		return nil
+	}
+	if err := a.ensureDefaultPeriodicJobs(ctx, userID); err != nil {
+		return err
+	}
+	row, err := a.getPeriodicJobByName(ctx, userID, "Clean Pending Files")
+	if err != nil {
+		return err
+	}
+	return a.workerStore.MarkDueNow(ctx, uuid.MustParse(row.ID), userID)
+}
+
 func defaultPeriodicJobPresets() []periodicJobPreset {
 	return []periodicJobPreset{
 		{Name: "Clean Old Events", Kind: periodicJobKindCleanOldEvents, CronExpression: "0 */12 * * *", Args: defaultCleanOldEventsPeriodicArgs(), System: true},

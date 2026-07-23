@@ -181,7 +181,17 @@ func TestFilesDeleteById(t *testing.T) {
 func TestFilesDeletePending(t *testing.T) {
 	s := newHarness(t)
 	ctx := context.Background()
-	_, client, _ := loginWithClient(t, s, 7202, "user7202")
+	userID := int64(7202)
+	_, client, _ := loginWithClient(t, s, userID, "user7202")
+
+	futureRun := time.Now().UTC().Add(time.Hour)
+	if _, err := s.pool.Exec(ctx, `
+		UPDATE periodic_jobs
+		SET next_run_at = $1
+		WHERE user_id = $2 AND kind = 'clean.pending_files'
+	`, futureRun, userID); err != nil {
+		t.Fatalf("delay pending-file cleanup: %v", err)
+	}
 
 	purgeFile, err := client.FilesCreate(ctx, &api.File{
 		Name:      "purge.txt",
@@ -196,6 +206,57 @@ func TestFilesDeletePending(t *testing.T) {
 	}
 	if err := client.FilesDelete(ctx, &api.FileDelete{Ids: []api.UUID{purgeFile.ID.Value}}); err != nil {
 		t.Fatalf("FilesDelete pending deletion failed: %v", err)
+	}
+
+	var nextRunAt time.Time
+	if err := s.pool.QueryRow(ctx, `
+		SELECT next_run_at
+		FROM periodic_jobs
+		WHERE user_id = $1 AND kind = 'clean.pending_files'
+	`, userID).Scan(&nextRunAt); err != nil {
+		t.Fatalf("read pending-file cleanup schedule: %v", err)
+	}
+	if nextRunAt.After(time.Now().UTC()) {
+		t.Fatalf("expected pending-file cleanup to be due immediately, got %s", nextRunAt)
+	}
+}
+
+func TestFilesDeleteFolderRecreateSameNameStartsEmpty(t *testing.T) {
+	s := newHarness(t)
+	ctx := context.Background()
+	_, client, _ := loginWithClient(t, s, 7212, "user7212")
+
+	folder, err := client.FilesCreate(ctx, &api.File{
+		Name: "docs", Type: api.FileTypeFolder, Path: api.NewOptString("/"),
+	})
+	if err != nil {
+		t.Fatalf("create original folder: %v", err)
+	}
+	if _, err := client.FilesCreate(ctx, &api.File{
+		Name: "inside.txt", Type: api.FileTypeFile, Path: api.NewOptString("/docs"),
+		MimeType: api.NewOptString("text/plain"), ChannelId: api.NewOptInt64(900012),
+		Parts: []api.Part{{ID: 12001}},
+	}); err != nil {
+		t.Fatalf("create original child: %v", err)
+	}
+
+	if err := client.FilesDelete(ctx, &api.FileDelete{Ids: []api.UUID{folder.ID.Value}}); err != nil {
+		t.Fatalf("delete original folder: %v", err)
+	}
+	if _, err := client.FilesCreate(ctx, &api.File{
+		Name: "docs", Type: api.FileTypeFolder, Path: api.NewOptString("/"),
+	}); err != nil {
+		t.Fatalf("recreate folder: %v", err)
+	}
+
+	listed, err := client.FilesList(ctx, api.FilesListParams{
+		Path: api.NewOptString("/docs"), Limit: api.NewOptInt(100),
+	})
+	if err != nil {
+		t.Fatalf("list recreated folder: %v", err)
+	}
+	if len(listed.Items) != 0 {
+		t.Fatalf("expected recreated folder to be empty, got %+v", listed.Items)
 	}
 }
 

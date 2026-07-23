@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/tgdrive/teldrive/internal/auth"
 	"github.com/tgdrive/teldrive/internal/config"
 	internalduration "github.com/tgdrive/teldrive/internal/duration"
@@ -125,9 +126,6 @@ func (e *jobExecutor) handleCleanPendingFiles(ctx context.Context, job *worker.J
 	if err != nil {
 		return err
 	}
-	if len(rows) == 0 {
-		return nil
-	}
 
 	filtered := make([]repositories.PendingFile, 0, len(rows))
 	for _, row := range rows {
@@ -136,7 +134,7 @@ func (e *jobExecutor) handleCleanPendingFiles(ctx context.Context, job *worker.J
 		}
 	}
 	if len(filtered) == 0 {
-		return nil
+		return e.api.repo.Files.DeletePendingFoldersByUser(ctx, args.UserID)
 	}
 
 	sessionByUser, err := latestSessionsByUsers(ctx, e.api, []int64{args.UserID})
@@ -144,17 +142,27 @@ func (e *jobExecutor) handleCleanPendingFiles(ctx context.Context, job *worker.J
 		return err
 	}
 
-	groups := groupPendingFiles(filtered, sessionByUser)
+	groups, unresolved := groupPendingFiles(filtered, sessionByUser)
 	for key, group := range groups {
 		if err := deleteChannelMessages(ctx, &e.api.cnf.TG, key.Session, key.ChannelID, group.partIDs); err != nil {
 			return err
 		}
+		fileIDs := make([]uuid.UUID, 0, len(group.fileIDs))
+		for _, id := range group.fileIDs {
+			parsed, parseErr := uuid.Parse(id)
+			if parseErr != nil {
+				return fmt.Errorf("invalid pending file id %q: %w", id, parseErr)
+			}
+			fileIDs = append(fileIDs, parsed)
+		}
+		if err := e.api.repo.Files.DeletePendingForDeletionByIDs(ctx, fileIDs, args.UserID); err != nil {
+			return err
+		}
 	}
-	if err := e.api.repo.Files.DeletePendingForDeletionByUser(ctx, args.UserID); err != nil {
-		return err
+	if len(unresolved) > 0 {
+		return fmt.Errorf("%d pending file(s) lack a usable Telegram session, channel, or message parts", len(unresolved))
 	}
-
-	return nil
+	return e.api.repo.Files.DeletePendingFoldersByUser(ctx, args.UserID)
 }
 
 func (e *jobExecutor) handleRefreshFolderSizes(ctx context.Context, job *worker.Job) error {
@@ -225,14 +233,30 @@ type pendingFileGroup struct {
 	partIDs []int
 }
 
-func groupPendingFiles(rows []repositories.PendingFile, sessionByUser map[int64]string) map[pendingFileGroupKey]*pendingFileGroup {
+func groupPendingFiles(rows []repositories.PendingFile, sessionByUser map[int64]string) (map[pendingFileGroupKey]*pendingFileGroup, []string) {
 	groups := make(map[pendingFileGroupKey]*pendingFileGroup)
+	unresolved := make([]string, 0)
 	for _, row := range rows {
 		if row.ChannelID == nil {
+			unresolved = append(unresolved, row.ID)
 			continue
 		}
 		session := sessionByUser[row.UserID]
 		if session == "" {
+			unresolved = append(unresolved, row.ID)
+			continue
+		}
+		if row.Parts == nil || *row.Parts == "" {
+			unresolved = append(unresolved, row.ID)
+			continue
+		}
+		var parts []pendingFilePart
+		if err := json.Unmarshal([]byte(*row.Parts), &parts); err != nil {
+			unresolved = append(unresolved, row.ID)
+			continue
+		}
+		if len(parts) == 0 {
+			unresolved = append(unresolved, row.ID)
 			continue
 		}
 		key := pendingFileGroupKey{ChannelID: *row.ChannelID, UserID: row.UserID, Session: session}
@@ -242,18 +266,11 @@ func groupPendingFiles(rows []repositories.PendingFile, sessionByUser map[int64]
 			groups[key] = group
 		}
 		group.fileIDs = append(group.fileIDs, row.ID)
-		if row.Parts == nil || *row.Parts == "" {
-			continue
-		}
-		var parts []pendingFilePart
-		if err := json.Unmarshal([]byte(*row.Parts), &parts); err != nil {
-			continue
-		}
 		for _, part := range parts {
 			group.partIDs = append(group.partIDs, part.ID)
 		}
 	}
-	return groups
+	return groups, unresolved
 }
 
 func latestSessionsByUsers(ctx context.Context, apiSvc *apiService, userIDs []int64) (map[int64]string, error) {

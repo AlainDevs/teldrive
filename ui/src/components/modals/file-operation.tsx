@@ -21,6 +21,7 @@ import HidePasswordIcon from "~icons/mdi/eye-off-outline";
 import MdiProtectedOutline from "~icons/mdi/protected-outline";
 import { $api } from "@/utils/api";
 import { useSearch } from "@tanstack/react-router";
+import { deleteConfirmation } from "@/utils/delete-files";
 
 interface FileModalProps {
   queryKey: any;
@@ -170,25 +171,24 @@ const FolderCreateDialog = memo(({ queryKey, handleClose }: FolderCreateDialogPr
 });
 
 interface DeleteDialogProps {
-  queryKey: any;
   handleClose: () => void;
 }
 
-const DeleteDialog = memo(({ handleClose, queryKey }: DeleteDialogProps) => {
+const DeleteDialog = memo(({ handleClose }: DeleteDialogProps) => {
   const queryClient = useQueryClient();
 
   const deleteFiles = $api.useMutation("post", "/files/delete", {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey });
+      queryClient.removeQueries({ queryKey: ["Files_list"] });
     },
   });
 
-  const selectedFiles = useModalStore((state) => state.selectedFiles) as string[];
+  const selectedFiles = useModalStore((state) => state.selectedFiles);
 
-  const onDelete = useCallback(() => {
-    deleteFiles.mutateAsync({ body: { ids: selectedFiles } });
+  const onDelete = useCallback(async () => {
+    await deleteFiles.mutateAsync({ body: { ids: selectedFiles.map((file) => file.id) } });
     handleClose();
-  }, [selectedFiles]);
+  }, [deleteFiles, handleClose, selectedFiles]);
 
   return (
     <>
@@ -197,9 +197,7 @@ const DeleteDialog = memo(({ handleClose, queryKey }: DeleteDialogProps) => {
       </Modal.Header>
       <Modal.Body>
         <h1 className="text-large font-medium mt-2">
-          {`Are you sure to delete ${selectedFiles.length} file${
-            selectedFiles.length > 1 ? "s" : ""
-          } ?`}
+          {deleteConfirmation(selectedFiles)}
         </h1>
       </Modal.Body>
       <Modal.Footer>
@@ -417,7 +415,7 @@ export const FileOperationModal = memo(({ queryKey }: FileModalProps) => {
       case FbActions.CreateFolder.id:
         return <FolderCreateDialog queryKey={queryKey} handleClose={handleClose} />;
       case FbActions.DeleteFiles.id:
-        return <DeleteDialog queryKey={queryKey} handleClose={handleClose} />;
+        return <DeleteDialog handleClose={handleClose} />;
       case CustomActions.ShareFiles.id:
         return <ShareFileDialog handleClose={handleClose} />;
       default:

@@ -25,6 +25,7 @@ import Share from "~icons/fluent/share-24-regular";
 import MaterialSymbolsFolder from "~icons/material-symbols/folder";
 import { useNavigate } from "@tanstack/react-router";
 import { $api } from "@/utils/api";
+import { deleteTargets } from "@/utils/delete-files";
 
 export const CustomActions = {
   CopyDownloadLink: defineFileAction({
@@ -185,10 +186,11 @@ export const useFileAction = (
           break;
         }
         case FbActions.DeleteFiles.id: {
+          const selectedFiles = deleteTargets(data.state.selectedFilesForAction);
           actions.set({
             open: true,
             operation: FbActions.DeleteFiles.id,
-            selectedFiles: data.state.selectedFiles.map((item) => item.id),
+            selectedFiles,
           });
           break;
         }

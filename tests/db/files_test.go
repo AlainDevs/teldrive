@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	jetmodel "github.com/tgdrive/teldrive/internal/database/jet/gen/model"
+	dbtypes "github.com/tgdrive/teldrive/internal/database/types"
 	"github.com/tgdrive/teldrive/pkg/repositories"
 )
 
@@ -461,6 +462,155 @@ func TestFileDelete(t *testing.T) {
 	_, err = fileRepo.GetByID(ctx, fileID)
 	if err != repositories.ErrNotFound {
 		t.Fatalf("expected ErrNotFound after delete, got %v", err)
+	}
+}
+
+func TestFileDeleteBulkRecursesWithinOwner(t *testing.T) {
+	s := newHarness(t)
+	ctx := context.Background()
+	ownerID := int64(7010)
+	otherUserID := int64(7011)
+	s.ensureUserExists(ownerID)
+	s.ensureUserExists(otherUserID)
+
+	fileRepo := repositories.NewJetFileRepository(s.pool)
+	folderID, err := fileRepo.CreateDirectories(ctx, ownerID, "/recursive-delete")
+	if err != nil {
+		t.Fatalf("create folder: %v", err)
+	}
+
+	active := "active"
+	now := time.Now().UTC()
+	ownerFileID := uuid.New()
+	otherFileID := uuid.New()
+	for _, item := range []*jetmodel.Files{
+		{
+			ID: ownerFileID, Name: "owner.txt", Type: "file", MimeType: "text/plain",
+			UserID: ownerID, ParentID: folderID, Status: &active, Encrypted: false,
+			CreatedAt: now, UpdatedAt: now,
+		},
+		{
+			ID: otherFileID, Name: "other.txt", Type: "file", MimeType: "text/plain",
+			UserID: otherUserID, ParentID: folderID, Status: &active, Encrypted: false,
+			CreatedAt: now, UpdatedAt: now,
+		},
+	} {
+		if err := fileRepo.Create(ctx, item); err != nil {
+			t.Fatalf("create file %s: %v", item.Name, err)
+		}
+	}
+
+	deleted, err := fileRepo.DeleteBulkReturning(
+		ctx,
+		[]uuid.UUID{*folderID},
+		ownerID,
+		"pending_deletion",
+	)
+	if err != nil {
+		t.Fatalf("delete folder subtree: %v", err)
+	}
+	if len(deleted) != 2 {
+		t.Fatalf("deleted row count mismatch: got %d want 2", len(deleted))
+	}
+	if _, err := fileRepo.GetByID(ctx, *folderID); err != repositories.ErrNotFound {
+		t.Fatalf("expected deleted folder to be inactive, got %v", err)
+	}
+	if _, err := fileRepo.GetByID(ctx, ownerFileID); err != repositories.ErrNotFound {
+		t.Fatalf("expected owner descendant to be inactive, got %v", err)
+	}
+	if _, err := fileRepo.GetByID(ctx, otherFileID); err != nil {
+		t.Fatalf("expected other user's file to remain active, got %v", err)
+	}
+}
+
+func TestDeletePendingForDeletionByIDsIsSelective(t *testing.T) {
+	s := newHarness(t)
+	ctx := context.Background()
+	uid := int64(7012)
+	s.ensureUserExists(uid)
+	fileRepo := repositories.NewJetFileRepository(s.pool)
+	parentID, err := fileRepo.CreateDirectories(ctx, uid, "/selective-purge")
+	if err != nil {
+		t.Fatalf("create parent: %v", err)
+	}
+
+	active := "active"
+	now := time.Now().UTC()
+	channelID := int64(701200)
+	parts := dbtypes.NewJSONB(dbtypes.Parts{{ID: 1}})
+	firstID := uuid.New()
+	secondID := uuid.New()
+	for _, id := range []uuid.UUID{firstID, secondID} {
+		if err := fileRepo.Create(ctx, &jetmodel.Files{
+			ID: id, Name: id.String(), Type: "file", MimeType: "text/plain", UserID: uid,
+			ParentID: parentID, Status: &active, ChannelID: &channelID, Parts: &parts,
+			Encrypted: false, CreatedAt: now, UpdatedAt: now,
+		}); err != nil {
+			t.Fatalf("create active file: %v", err)
+		}
+	}
+	marked, err := fileRepo.DeleteBulkReturning(ctx, []uuid.UUID{firstID, secondID}, uid, "pending_deletion")
+	if err != nil {
+		t.Fatalf("mark files pending: %v", err)
+	}
+	if len(marked) != 2 {
+		t.Fatalf("marked file count mismatch: %+v", marked)
+	}
+	for _, row := range marked {
+		if row.Status == nil || *row.Status != "pending_deletion" {
+			t.Fatalf("marked status mismatch: %+v", row.Status)
+		}
+	}
+	var pendingCount int
+	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM files WHERE user_id = $1 AND status = 'pending_deletion'`, uid).Scan(&pendingCount); err != nil {
+		t.Fatalf("count raw pending files: %v", err)
+	}
+	if pendingCount != 2 {
+		t.Fatalf("raw pending file count mismatch: got %d want 2", pendingCount)
+	}
+	rows, err := fileRepo.ListPendingForDeletion(ctx)
+	if err != nil {
+		t.Fatalf("list pending files before purge: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("pending rows before purge mismatch: %+v", rows)
+	}
+
+	if err := fileRepo.DeletePendingForDeletionByIDs(ctx, []uuid.UUID{firstID}, uid); err != nil {
+		t.Fatalf("selective purge: %v", err)
+	}
+	rows, err = fileRepo.ListPendingForDeletion(ctx)
+	if err != nil {
+		t.Fatalf("list pending files: %v", err)
+	}
+	if len(rows) != 1 || rows[0].ID != secondID.String() {
+		t.Fatalf("remaining pending rows mismatch: %+v", rows)
+	}
+}
+
+func TestDeletePendingFoldersByUser(t *testing.T) {
+	s := newHarness(t)
+	ctx := context.Background()
+	uid := int64(7013)
+	s.ensureUserExists(uid)
+	fileRepo := repositories.NewJetFileRepository(s.pool)
+	folderID, err := fileRepo.CreateDirectories(ctx, uid, "/pending-folder")
+	if err != nil {
+		t.Fatalf("create folder: %v", err)
+	}
+	if _, err := fileRepo.DeleteBulkReturning(ctx, []uuid.UUID{*folderID}, uid, "pending_deletion"); err != nil {
+		t.Fatalf("mark folder pending: %v", err)
+	}
+
+	if err := fileRepo.DeletePendingFoldersByUser(ctx, uid); err != nil {
+		t.Fatalf("purge pending folders: %v", err)
+	}
+	var count int
+	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM files WHERE id = $1`, *folderID).Scan(&count); err != nil {
+		t.Fatalf("count folder: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected pending folder to be purged, got count %d", count)
 	}
 }
 

@@ -68,6 +68,8 @@
   "scripts": {
     "dev": "vite dev --host",
     "build": "vite build",
+    "test": "bun test src",
+    "test:config": "node --test vite.config.test.mjs",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview ",
     "lint": "oxlint ./src",

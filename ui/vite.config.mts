@@ -4,7 +4,13 @@ import react from "@vitejs/plugin-react";
 import Icons from "unplugin-icons/vite";
 import { defineConfig, loadEnv } from "vite";
 import cp from "node:child_process";
-import { fileURLToPath } from "node:url";
+
+const sharedRuntimeIds = [
+  "react",
+  "react-dom",
+  "react/jsx-runtime",
+  "react/jsx-dev-runtime",
+];
 
 const commitHash = cp
   .execSync("git rev-parse --short HEAD")
@@ -56,11 +62,8 @@ export default defineConfig(({ mode }) => {
     },
     resolve: {
       tsconfigPaths: true,
-      alias: {
-        "file-browser": fileURLToPath(
-          new URL("../../tw-file-browser/packages/fb/dist", import.meta.url),
-        ),
-      },
+      dedupe: sharedRuntimeIds,
+      preserveSymlinks: true,
     },
   };
 });

@@ -409,6 +409,9 @@ func (a *apiService) FilesDeleteById(ctx context.Context, params api.FilesDelete
 		Name:     fileDB.Name,
 		ParentID: parentID,
 	})
+	if err := a.schedulePendingFileCleanup(ctx, userId); err != nil {
+		return &apiError{err: err}
+	}
 
 	return nil
 }
@@ -435,6 +438,9 @@ func (a *apiService) FilesDelete(ctx context.Context, req *api.FileDelete) error
 	}
 	if len(keys) > 0 {
 		a.cache.Delete(ctx, keys...)
+	}
+	if err := a.schedulePendingFileCleanup(ctx, userId); err != nil {
+		return &apiError{err: err}
 	}
 
 	return nil

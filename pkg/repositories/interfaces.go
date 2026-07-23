@@ -124,6 +124,8 @@ type FileRepository interface {
 	GetFullPath(ctx context.Context, fileID uuid.UUID) (string, error)
 	ListPendingForDeletion(ctx context.Context) ([]PendingFile, error)
 	DeletePendingForDeletionByUser(ctx context.Context, userID int64) error
+	DeletePendingForDeletionByIDs(ctx context.Context, fileIDs []uuid.UUID, userID int64) error
+	DeletePendingFoldersByUser(ctx context.Context, userID int64) error
 	RefreshFolderSizesByUser(ctx context.Context, userID int64) error
 	CategoryStats(ctx context.Context, userID int64) ([]CategoryStats, error)
 	DeleteBulk(ctx context.Context, fileIDs []uuid.UUID, userID int64, targetStatus string) error

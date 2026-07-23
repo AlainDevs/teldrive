@@ -6,13 +6,13 @@ interface ModalState {
   operation: string;
   type: string;
   currentFile: FileData;
-  selectedFiles?: string[];
+  selectedFiles: FileData[];
   name?: string;
   actions: {
     setOperation: (operation: string) => void;
     setOpen: (open: boolean) => void;
     setCurrentFile: (currentFile: FileData) => void;
-    setSelectedFiles: (selectedFiles: string[]) => void;
+    setSelectedFiles: (selectedFiles: FileData[]) => void;
     set: (payload: Partial<ModalState>) => void;
   };
 }
@@ -23,7 +23,7 @@ export const useModalStore = create<ModalState>((set) => ({
     setCurrentFile: (currentFile: FileData) => set((state) => ({ ...state, currentFile })),
     setOpen: (open: boolean) => set((state) => ({ ...state, open })),
     setOperation: (operation: string) => set((state) => ({ ...state, operation })),
-    setSelectedFiles: (selectedFiles: string[]) => set((state) => ({ ...state, selectedFiles })),
+    setSelectedFiles: (selectedFiles: FileData[]) => set((state) => ({ ...state, selectedFiles })),
   },
   currentFile: {} as FileData,
   name: "",
