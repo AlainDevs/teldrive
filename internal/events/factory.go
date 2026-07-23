@@ -4,17 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/tgdrive/teldrive/pkg/repositories"
 	"go.uber.org/zap"
-	"gorm.io/gorm"
 )
 
-func NewBroadcaster(ctx context.Context, db *gorm.DB, redisClient *redis.Client, pollInterval time.Duration, config BroadcasterConfig, logger *zap.Logger) EventBroadcaster {
-	if redisClient != nil {
-		logger.Debug("events.using_redis_broadcaster")
-		return NewRedisBroadcaster(ctx, db, redisClient, config, logger)
-	}
-
-	logger.Debug("events.using_polling_broadcaster", zap.Duration("poll_interval", pollInterval))
-	return NewPollingBroadcaster(ctx, db, pollInterval, config, logger)
+func NewBroadcaster(ctx context.Context, eventsRepo repositories.EventRepository, listenDSN string, pollInterval time.Duration, config BroadcasterConfig, logger *zap.Logger) EventBroadcaster {
+	logger.Debug("events.using_postgres_broadcaster", zap.Duration("poll_interval", pollInterval))
+	return NewPostgresBroadcaster(ctx, eventsRepo, listenDSN, pollInterval, config, logger)
 }

@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "eslint", "react", "react-perf", "jsx-a11y"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "warn",
+    "style": "warn"
+  },
+  "rules": {
+    "no-console": "warn",
+    "typescript/no-explicit-any": "off",
+    "typescript/no-non-null-assertion": "off",
+    "no-param-reassign": "off",
+    "unicorn/no-array-for-each": "off",
+    "react/react-in-jsx-scope": "off",
+    "react-hooks/exhaustive-deps": "off",
+    "jsx-a11y/click-events-have-key-events": "off",
+    "unicorn/no-null": "off",
+    "unicorn/switch-case-braces": "off",
+    "no-shadow": "off",
+    "no-unused-expressions": "off",
+    "react/no-danger": "off"
+  },
+  "env": {
+    "builtin": true,
+    "browser": true,
+    "es2025": true
+  }
+}

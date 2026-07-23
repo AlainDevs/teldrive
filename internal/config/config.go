@@ -21,6 +21,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/tgdrive/teldrive/internal/duration"
+	"github.com/tgdrive/teldrive/internal/size"
 )
 
 var (
@@ -49,27 +50,30 @@ type EventConfig struct {
 }
 
 type ServerCmdConfig struct {
-	Server   ServerConfig
-	Log      LoggingConfig
-	JWT      JWTConfig
-	DB       DBConfig
-	TG       TGConfig
-	CronJobs CronJobConfig
-	Cache    CacheConfig
-	Redis    RedisConfig
-	Events   EventConfig
+	Server ServerConfig
+	Log    LoggingConfig
+	JWT    JWTConfig
+	DB     DBConfig
+	TG     TGConfig
+	Cache  CacheConfig
+	Redis  RedisConfig
+	Worker WorkerConfig
+	Events EventConfig
+}
+
+type WorkerConfig struct {
+	CronPollEvery time.Duration `default:"10m" description:"Fallback poll interval for cron background jobs when LISTEN/NOTIFY is unavailable"`
+	CronLockID    int64         `default:"2123216947" description:"PostgreSQL advisory lock ID for cron background jobs"`
 }
 
 type CheckCmdConfig struct {
-	Log          LoggingConfig `skipPflag:"true"`
-	DB           DBConfig      `skipPflag:"true"`
-	TG           TGConfig      `skipPflag:"true"`
-	ExportFile   string        `default:"results.json" description:"Path for exported JSON file"`
-	DryRun       bool          `default:"false" description:"Simulate check/clean process without making changes"`
-	User         string        `default:"" description:"Telegram username to check (prompts if not specified)"`
-	Concurrent   int           `default:"4" description:"Number of concurrent channel processing"`
-	CleanUploads bool          `default:"false" description:"Clean incomplete uploads"`
-	CleanPending bool          `default:"false" description:"Clean files with pending_deletion status"`
+	Log        LoggingConfig `skipPflag:"true"`
+	DB         DBConfig      `skipPflag:"true"`
+	TG         TGConfig      `skipPflag:"true"`
+	ExportFile string        `default:"results.json" description:"Path for exported JSON file"`
+	DryRun     bool          `default:"false" description:"Simulate check/clean process without making changes"`
+	User       string        `default:"" description:"Telegram username to check (prompts if not specified)"`
+	Concurrent int           `default:"4" description:"Number of concurrent channel processing"`
 }
 
 type ServerConfig struct {
@@ -81,7 +85,38 @@ type ServerConfig struct {
 }
 
 type CacheConfig struct {
-	MaxSize int `default:"10485760" description:"Maximum cache size in bytes (used for memory cache)"`
+	MaxSize size.Size         `default:"10MB" description:"Maximum cache size in bytes (used for memory cache)"`
+	Stream  StreamCacheConfig `koanf:"stream"`
+}
+
+type StreamCacheConfig struct {
+	// Dir is the directory for stream content disk cache.
+	Dir string `default:"~/.teldrive/cache" description:"Directory for stream content disk cache"`
+
+	// MaxAge evicts entries whose AccessedAt is older than this duration.
+	MaxAge time.Duration `default:"168h" description:"Maximum age for cached stream chunks"`
+
+	// MaxSize keeps total cache data bytes under this value after pruning.
+	MaxSize size.Size `default:"50GB" description:"Maximum stream cache size in bytes"`
+
+	// ChunkSize is the Telegram download window per fetch. Larger chunks
+	// reduce round trips but increase memory per download.
+	ChunkSize size.Size `default:"32MB" description:"Telegram download chunk size in bytes"`
+
+	// ChunkStreams limits concurrent Telegram downloads across all users.
+	ChunkStreams int `default:"4" description:"Maximum concurrent Telegram downloads"`
+
+	// ReadAhead opportunistically schedules this many bytes after every
+	// read range. Useful for sequential media playback.
+	ReadAhead size.Size `default:"4MB" description:"Read-ahead bytes for sequential media playback"`
+
+	// MinFreeSpace prevents the cache from filling the disk. Prune evicts
+	// entries when free space drops below this threshold.
+	MinFreeSpace size.Size `default:"10GB" description:"Minimum free disk space in bytes"`
+
+	// PollInterval controls how often the background janitor runs.
+	// The janitor enforces max-age, max-size, and min-free-space limits.
+	PollInterval time.Duration `default:"5m" description:"Background cache cleanup interval"`
 }
 
 type RedisConfig struct {
@@ -108,10 +143,9 @@ type HTTPLoggingConfig struct {
 
 // DBLoggingConfig holds database query logging configuration
 type DBLoggingConfig struct {
-	Level                string        `default:"error" description:"Database logging level (silent, error, warn, info, debug)"`
-	SlowThreshold        time.Duration `default:"1s" description:"Log queries slower than this threshold"`
-	IgnoreRecordNotFound bool          `default:"true" description:"Don't log 'record not found' errors"`
-	LogSQL               bool          `default:"true" description:"LogSQL"`
+	Level         string        `default:"error" description:"Database logging level (silent, error, warn, info, debug)"`
+	SlowThreshold time.Duration `default:"1s" description:"Log queries slower than this threshold"`
+	LogSQL        bool          `default:"false" description:"LogSQL"`
 }
 
 // TGLoggingConfig holds Telegram client logging configuration
@@ -143,16 +177,9 @@ type DBPool struct {
 }
 type DBConfig struct {
 	DataSource  string `validate:"required" default:"" description:"Database connection string"`
+	Schema      string `default:"teldrive" description:"Database schema name"`
 	PrepareStmt bool   `default:"true" description:"Use prepared statements"`
 	Pool        DBPool
-}
-
-type CronJobConfig struct {
-	Enable               bool          `default:"true" description:"Enable scheduled background jobs"`
-	LockerInstance       string        `default:"cron-locker" description:"Distributed unique cron locker name"`
-	CleanFilesInterval   time.Duration `default:"1h" description:"Interval for cleaning expired files"`
-	CleanUploadsInterval time.Duration `default:"12h" description:"Interval for cleaning incomplete uploads"`
-	FolderSizeInterval   time.Duration `default:"2h" description:"Interval for updating folder sizes"`
 }
 
 type TGStream struct {
@@ -167,17 +194,27 @@ type TGUpload struct {
 	Threads       int           `default:"8" description:"Number of upload threads"`
 	MaxRetries    int           `default:"10" description:"Maximum upload retry attempts"`
 	Retention     time.Duration `default:"7d" description:"Upload retention period"`
+	ChunkNaming   string        `default:"random" description:"Upload chunk naming mode (random, deterministic)"`
 }
+
+type TGMTProxy struct {
+	Addr   string `default:"" description:"MTProto proxy address in host:port format"`
+	Secret string `default:"" description:"MTProto proxy secret as hex string"`
+}
+
 type TGConfig struct {
 	RateLimit         bool          `default:"true" description:"Enable rate limiting for API calls"`
 	RateBurst         int           `default:"5" description:"Maximum burst size for rate limiting"`
 	Rate              int           `default:"100" description:"Rate limit in requests per minute"`
 	Ntp               bool          `default:"false" description:"Use NTP for time synchronization"`
+	NtpServer         string        `default:"pool.ntp.org" description:"NTP server address"`
 	Proxy             string        `default:"" description:"HTTP/SOCKS5 proxy URL"`
+	MTProxy           TGMTProxy     `koanf:"mtproxy"`
 	ReconnectTimeout  time.Duration `default:"5m" description:"Client reconnection timeout"`
+	DialTimeout       time.Duration `default:"10s" description:"Timeout for connecting to Telegram servers"`
 	PoolSize          int           `default:"8" description:"Session pool size"`
 	EnableLogging     bool          `default:"false" description:"Enable Telegram client logging (deprecated: use logging.tg.enabled instead)"`
-	AppId             int           `default:"2496" description:"Telegram app ID"`
+	AppID             int           `default:"2496" description:"Telegram app ID"`
 	AppHash           string        `default:"8da85b0d5bfe62527e5b244c209159c3" description:"Telegram app hash"`
 	DeviceModel       string        `default:"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/116.0" description:"Device model"`
 	SystemVersion     string        `default:"Win32" description:"System version"`
@@ -218,6 +255,76 @@ func NewConfigLoader() *ConfigLoader {
 		flagMap: make(map[string]string),
 		envMap:  make(map[string]string),
 	}
+}
+
+func DefaultServerConfigMap() map[string]any {
+	return buildDefaultsMap(reflect.TypeFor[ServerCmdConfig]())
+}
+
+func buildDefaultsMap(t reflect.Type) map[string]any {
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+
+	out := make(map[string]any)
+	if t.Kind() != reflect.Struct {
+		return out
+	}
+
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		key := getKey(field)
+
+		if field.Type.Kind() == reflect.Struct && field.Type != reflect.TypeFor[time.Duration]() {
+			out[key] = buildDefaultsMap(field.Type)
+			continue
+		}
+
+		defaultValue, ok := field.Tag.Lookup("default")
+		if !ok {
+			continue
+		}
+
+		out[key] = parseDefaultValue(field.Type, defaultValue)
+	}
+
+	return out
+}
+
+func parseDefaultValue(t reflect.Type, defaultValue string) any {
+	if t == reflect.TypeFor[time.Duration]() {
+		return defaultValue
+	}
+	if t == reflect.TypeFor[size.Size]() {
+		return defaultValue
+	}
+
+	switch t.Kind() {
+	case reflect.Int:
+		val, err := strconv.Atoi(defaultValue)
+		if err == nil {
+			return val
+		}
+	case reflect.Int64:
+		val, err := strconv.ParseInt(defaultValue, 10, 64)
+		if err == nil {
+			return val
+		}
+	case reflect.Bool:
+		val, err := strconv.ParseBool(defaultValue)
+		if err == nil {
+			return val
+		}
+	case reflect.Slice:
+		if t.Elem().Kind() == reflect.String {
+			if defaultValue == "" {
+				return []string{}
+			}
+			return strings.Split(defaultValue, ",")
+		}
+	}
+
+	return defaultValue
 }
 
 // customFlagProvider loads flags from a pflag.FlagSet.
@@ -359,10 +466,14 @@ func (cl *ConfigLoader) Load(cmd *cobra.Command, cfg any) error {
 					if f.Kind() != reflect.String {
 						return data, nil
 					}
-					if t != reflect.TypeFor[time.Duration]() {
-						return data, nil
+					switch t {
+					case reflect.TypeFor[time.Duration]():
+						return duration.ParseDuration(data.(string))
+					case reflect.TypeFor[size.Size]():
+						parsed, err := size.ParseSize(data.(string))
+						return size.Size(parsed), err
 					}
-					return duration.ParseDuration(data.(string))
+					return data, nil
 				},
 			),
 			Result:           cfg,
@@ -464,24 +575,9 @@ func (cl *ConfigLoader) registerDefaultsRecursive(t reflect.Type, prefix string)
 			continue
 		}
 
-		defaultValue := field.Tag.Get("default")
-		if defaultValue != "" {
-			var val any = defaultValue
-			switch field.Type.Kind() {
-			case reflect.Int:
-				val, _ = strconv.Atoi(defaultValue)
-			case reflect.Int64:
-				if field.Type != reflect.TypeFor[time.Duration]() {
-					val, _ = strconv.ParseInt(defaultValue, 10, 64)
-				}
-			case reflect.Bool:
-				val, _ = strconv.ParseBool(defaultValue)
-			case reflect.Slice:
-				if field.Type.Elem().Kind() == reflect.String {
-					val = strings.Split(defaultValue, ",")
-				}
-			}
-			cl.k.Set(key, val)
+		defaultValue, ok := field.Tag.Lookup("default")
+		if ok {
+			cl.k.Set(key, parseDefaultValue(field.Type, defaultValue))
 		}
 	}
 }
@@ -521,6 +617,10 @@ func (cl *ConfigLoader) registerStruct(flags *pflag.FlagSet, prefix string, t re
 				val, _ := duration.ParseDuration(defaultValue)
 				d := duration.Duration(val)
 				flags.Var(&d, name, description)
+			} else if field.Type == reflect.TypeFor[size.Size]() {
+				val, _ := size.ParseSize(defaultValue)
+				s := size.Size(val)
+				flags.Var(&s, name, description)
 			} else {
 				val, _ := strconv.ParseInt(defaultValue, 10, 64)
 				flags.Int64(name, val, description)

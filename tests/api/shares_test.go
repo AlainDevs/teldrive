@@ -1,0 +1,225 @@
+package api_test
+
+import (
+	"context"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/tgdrive/teldrive/internal/api"
+	jetmodel "github.com/tgdrive/teldrive/internal/database/jet/gen/model"
+	"golang.org/x/crypto/bcrypt"
+)
+
+func TestSharesRoutes_Flow(t *testing.T) {
+	s := newHarness(t)
+	ctx := context.Background()
+	public, client, _ := loginWithClient(t, s, 7204, "user7204")
+	if err := client.UsersUpdateChannel(ctx, &api.ChannelUpdate{ChannelId: api.NewOptInt64(910080), ChannelName: api.NewOptString("share-default")}); err != nil {
+		t.Fatalf("UsersUpdateChannel failed: %v", err)
+	}
+
+	folder, err := client.FilesCreate(ctx, &api.File{Name: "share-folder", Type: api.FileTypeFolder, Path: api.NewOptString("/")})
+	if err != nil {
+		t.Fatalf("FilesCreate folder failed: %v", err)
+	}
+
+	file, err := client.FilesCreate(ctx, &api.File{Name: "share-file.txt", Type: api.FileTypeFile, Path: api.NewOptString("/"), MimeType: api.NewOptString("text/plain"), ChannelId: api.NewOptInt64(910080), Size: api.NewOptInt64(12)})
+	if err != nil {
+		t.Fatalf("FilesCreate file failed: %v", err)
+	}
+
+	if err := client.FilesCreateShare(ctx, &api.FileShareCreate{}, api.FilesCreateShareParams{ID: folder.ID.Value}); err != nil {
+		t.Fatalf("FilesCreateShare folder failed: %v", err)
+	}
+	if err := client.FilesCreateShare(ctx, &api.FileShareCreate{}, api.FilesCreateShareParams{ID: file.ID.Value}); err != nil {
+		t.Fatalf("FilesCreateShare file failed: %v", err)
+	}
+
+	folderShares, err := client.FilesListShares(ctx, api.FilesListSharesParams{ID: folder.ID.Value})
+	if err != nil || len(folderShares) == 0 {
+		t.Fatalf("FilesListShares folder failed: %v len=%d", err, len(folderShares))
+	}
+
+	if _, err := public.SharesGetById(ctx, api.SharesGetByIdParams{ID: folderShares[0].ID}); err != nil {
+		t.Fatalf("SharesGetById failed: %v", err)
+	}
+
+	fileShares, err := client.FilesListShares(ctx, api.FilesListSharesParams{ID: file.ID.Value})
+	if err != nil || len(fileShares) == 0 {
+		t.Fatalf("FilesListShares file failed: %v len=%d", err, len(fileShares))
+	}
+
+	shareFiles, err := public.SharesListFiles(ctx, api.SharesListFilesParams{ID: fileShares[0].ID, Limit: api.NewOptInt(20), Sort: api.NewOptShareQuerySort(api.ShareQuerySortName), Order: api.NewOptShareQueryOrder(api.ShareQueryOrderAsc)})
+	if err != nil {
+		t.Fatalf("SharesListFiles failed: %v", err)
+	}
+	if len(shareFiles.Items) != 1 {
+		t.Fatalf("expected one shared file, got items=%d", len(shareFiles.Items))
+	}
+
+	if err := client.FilesCreateShare(ctx, &api.FileShareCreate{Password: api.NewOptString("pw1")}, api.FilesCreateShareParams{ID: folder.ID.Value}); err != nil {
+		t.Fatalf("FilesCreateShare protected failed: %v", err)
+	}
+
+	shares2, err := client.FilesListShares(ctx, api.FilesListSharesParams{ID: folder.ID.Value})
+	if err != nil {
+		t.Fatalf("FilesListShares protected failed: %v", err)
+	}
+
+	var protectedShareID api.UUID
+	for _, sh := range shares2 {
+		if sh.Protected {
+			protectedShareID = sh.ID
+			break
+		}
+	}
+	if uuid.UUID(protectedShareID) == uuid.Nil {
+		t.Fatalf("expected protected share")
+	}
+
+	_, err = public.SharesListFiles(ctx, api.SharesListFilesParams{ID: protectedShareID, Limit: api.NewOptInt(20), Sort: api.NewOptShareQuerySort(api.ShareQuerySortName), Order: api.NewOptShareQueryOrder(api.ShareQueryOrderAsc)})
+	if statusCode(err) != 401 {
+		t.Fatalf("expected 401 before unlock, got %d err=%v", statusCode(err), err)
+	}
+
+	_, err = public.SharesUnlock(ctx, &api.ShareUnlock{Password: "wrong"}, api.SharesUnlockParams{ID: protectedShareID})
+	if statusCode(err) != 403 {
+		t.Fatalf("expected 403 for wrong password, got %d err=%v", statusCode(err), err)
+	}
+	unlockRes, err := public.SharesUnlock(ctx, &api.ShareUnlock{Password: "pw1"}, api.SharesUnlockParams{ID: protectedShareID})
+	if err != nil {
+		t.Fatalf("SharesUnlock correct password failed: %v", err)
+	}
+	if unlockRes.SetCookie == "" {
+		t.Fatalf("expected share unlock cookie")
+	}
+	_, err = public.SharesListFiles(ctx, api.SharesListFilesParams{ID: protectedShareID, Limit: api.NewOptInt(20), Sort: api.NewOptShareQuerySort(api.ShareQuerySortName), Order: api.NewOptShareQueryOrder(api.ShareQueryOrderAsc)})
+	if err != nil {
+		t.Fatalf("expected protected share access after unlock, got %v", err)
+	}
+}
+
+func TestSharesGetById_Expired(t *testing.T) {
+	s := newHarness(t)
+	ctx := context.Background()
+	_, client, _ := loginWithClient(t, s, 8403, "user8403")
+
+	if err := client.UsersUpdateChannel(ctx, &api.ChannelUpdate{ChannelId: api.NewOptInt64(910083), ChannelName: api.NewOptString("expired-test")}); err != nil {
+		t.Fatalf("UsersUpdateChannel failed: %v", err)
+	}
+
+	folder, err := client.FilesCreate(ctx, &api.File{Name: "expired-share-folder", Type: api.FileTypeFolder, Path: api.NewOptString("/")})
+	if err != nil {
+		t.Fatalf("FilesCreate folder failed: %v", err)
+	}
+
+	// Seed an expired share via DB with a past expiration time.
+	shareID := uuid.New()
+	pastTime := time.Now().UTC().Add(-1 * time.Hour)
+	if err := s.repos.Shares.Create(ctx, &jetmodel.FileShares{
+		ID:        shareID,
+		FileID:    uuid.UUID(folder.ID.Value),
+		ExpiresAt: &pastTime,
+		UserID:    8403,
+	}); err != nil {
+		t.Fatalf("seed expired share: %v", err)
+	}
+
+	_, err = client.SharesGetById(ctx, api.SharesGetByIdParams{ID: api.UUID(shareID)})
+	if statusCode(err) != 404 {
+		t.Fatalf("expected 404 for expired share, got %d err=%v", statusCode(err), err)
+	}
+}
+
+func TestSharesUnlock_Expired(t *testing.T) {
+	s := newHarness(t)
+	ctx := context.Background()
+	_, client, _ := loginWithClient(t, s, 8403, "user8403")
+
+	if err := client.UsersUpdateChannel(ctx, &api.ChannelUpdate{ChannelId: api.NewOptInt64(910083), ChannelName: api.NewOptString("expired-unlock-test")}); err != nil {
+		t.Fatalf("UsersUpdateChannel failed: %v", err)
+	}
+
+	folder, err := client.FilesCreate(ctx, &api.File{Name: "expired-unlock-folder", Type: api.FileTypeFolder, Path: api.NewOptString("/")})
+	if err != nil {
+		t.Fatalf("FilesCreate folder failed: %v", err)
+	}
+
+	// Seed an expired share with a bcrypt-hashed password via DB.
+	shareID := uuid.New()
+	pastTime := time.Now().UTC().Add(-1 * time.Hour)
+	hashed, err := bcrypt.GenerateFromPassword([]byte("x"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("bcrypt hash: %v", err)
+	}
+	hashedStr := string(hashed)
+	if err := s.repos.Shares.Create(ctx, &jetmodel.FileShares{
+		ID:        shareID,
+		FileID:    uuid.UUID(folder.ID.Value),
+		Password:  &hashedStr,
+		ExpiresAt: &pastTime,
+		UserID:    8403,
+	}); err != nil {
+		t.Fatalf("seed expired share: %v", err)
+	}
+
+	_, err = client.SharesUnlock(ctx, &api.ShareUnlock{Password: "x"}, api.SharesUnlockParams{ID: api.UUID(shareID)})
+	if statusCode(err) != 404 {
+		t.Fatalf("expected 404 for expired share unlock, got %d err=%v", statusCode(err), err)
+	}
+}
+
+func TestSharesRoutes_Validation(t *testing.T) {
+	s := newHarness(t)
+	ctx := context.Background()
+	token := loginAndGetToken(t, s, 7205, "user7205")
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.server.URL+"/shares/bad-uuid", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Cookie", "access_token="+token)
+	resp, err := s.httpCli.Do(req)
+	if err != nil {
+		t.Fatalf("do request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.StatusCode)
+	}
+	body := make([]byte, 4096)
+	n, _ := resp.Body.Read(body)
+	e := decodeError(t, body[:n])
+	if e.Code != 0 && e.Code != 400 {
+		t.Fatalf("expected body.code=400, got %d", e.Code)
+	}
+	if e.Code != 0 && e.RequestID == "" {
+		t.Fatal("expected body.requestId")
+	}
+
+	req, err = http.NewRequestWithContext(ctx, http.MethodPost, s.server.URL+"/shares/bad-uuid/unlock", strings.NewReader(`{"password":"x"}`))
+	if err != nil {
+		t.Fatalf("new unlock request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Cookie", "access_token="+token)
+	resp, err = s.httpCli.Do(req)
+	if err != nil {
+		t.Fatalf("do unlock request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.StatusCode)
+	}
+	body2 := make([]byte, 4096)
+	n2, _ := resp.Body.Read(body2)
+	e2 := decodeError(t, body2[:n2])
+	if e2.Code != 0 && e2.Code != 400 {
+		t.Fatalf("expected body.code=400, got %d", e2.Code)
+	}
+}
